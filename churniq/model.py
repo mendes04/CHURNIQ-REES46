@@ -197,12 +197,12 @@ def predict(artifact, df: pd.DataFrame, threshold: float = 0.5, id_column: str |
         ids = np.array([f"ROW-{i + 1:06d}" for i in range(len(df))])
     result = pd.DataFrame({
         "customer_id": ids,
-        "predicted_inactivity_risk": probability,
-        "predicted_inactive_next_month": (probability >= threshold).astype(int),
+        "predicted_no_purchase_risk": probability,
+        "predicted_no_purchase_next_4_weeks": (probability >= threshold).astype(int),
         "risk_band": pd.cut(probability, bins=[-0.001, 0.4, 0.7, 1.001],
                             labels=["Low", "Moderate", "High"], right=False).astype(str),
     })
-    result["predicted_inactivity_risk_pct"] = (result["predicted_inactivity_risk"] * 100).round(1)
+    result["predicted_no_purchase_risk_pct"] = (result["predicted_no_purchase_risk"] * 100).round(1)
     return result
 
 
