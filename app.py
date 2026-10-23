@@ -387,7 +387,7 @@ elif page == "Why Customers Are Flagged":
         st.session_state["focused_customer_idx"] = int(selected)
         selected_row = result.iloc[selected]
         col1, col2 = st.columns(2)
-        col1.metric("Risk score", f"{selected_row['predicted_no_purchase_risk_pct']:.1f} / 100")
+        col1.metric("Model risk score", f"{selected_row['predicted_no_purchase_risk_pct']:.1f} / 100")
         col2.metric("Review priority", display_priority(selected_row["risk_band"]))
         risk_note()
         try:
@@ -397,49 +397,73 @@ elif page == "Why Customers Are Flagged":
             local["Effect on score"] = local["contribution_log_odds"].map(readable_effect)
             local["Strength"] = local["contribution_log_odds"].abs()
             most = local.sort_values("Strength", ascending=False).head(5)
-            st.subheader("The strongest signals for this record")
-            st.dataframe(
-                most[["Shopping signal", "Effect on score"]],
-                hide_index=True,
-                use_container_width=True,
+            increased = local[local["contribution_log_odds"] > 0].sort_values(
+                "contribution_log_odds", ascending=False
             )
-            st.caption(
-                "An upward signal made the model's risk score higher; a downward signal "
-                "made it lower. This does not establish the cause of any customer's behaviour."
-            )
-            st.subheader("What could your team review next?")
+            important_signals = list(dict.fromkeys(increased["Shopping signal"].tolist()))[:2]
+            st.subheader("What this means for your store")
+            if important_signals:
+                st.write(
+                    "The model flagged shopping patterns related to "
+                    + " and ".join(f"**{name.lower()}**" for name in important_signals)
+                    + " as important signals behind this risk estimate."
+                )
+            else:
+                st.write(
+                    "No single risk-increasing shopping pattern stands out in the "
+                    "top explanation. Review the customer's history before acting."
+                )
+            st.markdown("#### What should your team check?")
             review_prompts = suggested_review_checks(
                 list(zip(local["feature"], local["contribution_log_odds"]))
             )
             for prompt in review_prompts:
                 st.markdown("- " + prompt)
             st.caption(
-                "These are suggested checks based on important model signals, "
-                "not proven reasons for not purchasing or guaranteed marketing solutions."
+                "These are suggested checks based on model signals. They do not "
+                "prove why a customer might stop buying or guarantee a successful follow-up."
             )
-            diagram = local.sort_values("contribution_log_odds").copy()
-            diagram["Impact"] = diagram["contribution_log_odds"].map(
-                lambda value: "Raised estimated risk" if value > 0 else "Lowered estimated risk"
+            st.subheader("Shopping patterns that influenced the estimate")
+            st.dataframe(
+                most[["Shopping signal", "Effect on score"]],
+                hide_index=True,
+                use_container_width=True,
             )
-            figure = px.bar(
-                diagram, x="contribution_log_odds", y="Shopping signal", orientation="h",
-                color="Impact",
-                color_discrete_map={
-                    "Raised estimated risk": "#f68da0",
-                    "Lowered estimated risk": "#40d6ba",
-                },
-                hover_data={"feature": True, "contribution_log_odds": ":.3f"},
-                template="plotly_dark",
-                labels={
-                    "contribution_log_odds": "Influence on model score (not probability points)"
-                },
+            st.caption(
+                "The model may raise or lower a customer's risk score based on each "
+                "pattern. These effects are model explanations, not causes."
             )
-            figure.update_layout(legend_title_text=None, height=500)
-            st.plotly_chart(figure, use_container_width=True)
+            with st.expander("Explore the detailed influence chart (advanced)"):
+                diagram = local.sort_values("contribution_log_odds").copy()
+
+                diagram["Impact"] = diagram["contribution_log_odds"].map(
+                    lambda value: "Raised estimated risk" if value > 0 else "Lowered estimated risk"
+                )
+                figure = px.bar(
+                    diagram, x="contribution_log_odds", y="Shopping signal", orientation="h",
+                    color="Impact",
+                    color_discrete_map={
+                        "Raised estimated risk": "#f68da0",
+                        "Lowered estimated risk": "#40d6ba",
+                    },
+                    hover_data={"feature": True, "contribution_log_odds": ":.3f"},
+                    template="plotly_dark",
+                    labels={
+                        "contribution_log_odds": "Influence on model score (not probability points)"
+                    },
+                )
+                figure.update_layout(legend_title_text=None, height=500)
+                st.plotly_chart(figure, use_container_width=True)
             st.info(
                 "Before taking action, review the customer's actual order history, "
                 "shopping activity and service interactions. A model explanation "
                 "is not evidence that a specific event caused the prediction."
+            )
+            st.button(
+                "Open follow-up planner →",
+                on_click=go_to, args=("Follow-up Planner",),
+                key="explanation_to_planner",
+                type="primary",
             )
             with st.expander("Which signals matter across all uploaded records?"):
                 global_detail = explain(bundle, raw, max_rows=min(150, len(raw)))
