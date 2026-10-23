@@ -218,3 +218,22 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# CHURNIQ: keep local customer data and model artifacts out of Git
+/data/
+*.csv
+*.parquet
+*.feather
+*.joblib
+*.pkl
+*.pickle
+*.onnx
+*.sqlite
+*.db
+*.zip
+*.gz
+*.jsonl
+.env*
+!.env.example
+.streamlit/secrets.toml
+/rees46_profile.json
