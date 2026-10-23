@@ -161,7 +161,7 @@ elif page == "Retention Planner":
 
 elif page == "Research Lab":
     st.title("Research Lab · Examiner View")
-    tab1,tab2=st.tabs(["Evaluation","Train model"])
+    tab1,tab2,tab3=st.tabs(["Evaluation","Train model","Calibration study"])
     with tab1:
         if bundle is None:
             st.info("No trained model yet.")
@@ -195,6 +195,80 @@ elif page == "Research Lab":
                     st.success("Model trained and saved. View Evaluation.")
             except Exception as error:
                 st.error(str(error))
+
+    with tab3:
+        st.subheader("Calibration Study — Experimental Results")
+        st.warning(
+            "These findings come from a separate three-way customer-disjoint experiment. "
+            "They do NOT represent the calibration status of the model currently serving predictions "
+            "in CHURNIQ, and do not establish future-period calibration."
+        )
+        calibration_report_path = Path(__file__).parent / "data" / "reports" / "rees46_calibration_full.json"
+        if calibration_report_path.exists():
+            try:
+                import json
+                study = json.loads(calibration_report_path.read_text(encoding="utf-8"))
+                if study.get("experiment") != "exploratory_group_disjoint_sigmoid_calibration" or study.get("fast") is not False:
+                    st.error("Expected the FULL three-way sigmoid calibration experiment report.")
+                else:
+                    raw_metrics = study["raw_test"]
+                    calibrated_metrics = study["calibrated_test"]
+                    st.caption(
+                        f"Train: {study['train_customers']:,} distinct customers · "
+                        f"Calibrate: {study['calibration_customers']:,} · "
+                        f"Evaluate: {study['test_customers']:,} · "
+                        f"Customer overlap: {study['group_overlap']}"
+                    )
+                    left, right, third = st.columns(3)
+                    left.metric("Raw calibration error (ECE)", f"{raw_metrics['ece_10_bins']:.2%}")
+                    right.metric("Calibrated error (ECE)", f"{calibrated_metrics['ece_10_bins']:.2%}")
+                    third.metric("Calibrated Brier score", f"{calibrated_metrics['brier']:.4f}")
+                    metric_labels = {
+                        "accuracy": "Accuracy",
+                        "precision": "Precision",
+                        "recall": "Recall",
+                        "f1": "F1-score",
+                        "roc_auc": "ROC-AUC",
+                        "brier": "Brier (lower is better)",
+                        "ece_10_bins": "ECE (lower is better)",
+                    }
+                    rows = [{
+                        "Metric": label,
+                        "Before calibration": raw_metrics[key],
+                        "After calibration": calibrated_metrics[key],
+                    } for key, label in metric_labels.items()]
+                    comparison = pd.DataFrame(rows)
+                    st.dataframe(
+                        comparison.style.format({
+                            "Before calibration": "{:.4f}",
+                            "After calibration": "{:.4f}",
+                        }),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                    calibration_error_chart = pd.DataFrame({
+                        "Stage": ["Raw model", "Sigmoid-calibrated model"],
+                        "ECE (%)": [raw_metrics["ece_10_bins"] * 100,
+                                    calibrated_metrics["ece_10_bins"] * 100],
+                    })
+                    st.plotly_chart(
+                        px.bar(calibration_error_chart, x="Stage", y="ECE (%)",
+                               title="Expected Calibration Error — Lower Is Better"),
+                        use_container_width=True,
+                    )
+                    st.caption(
+                        "ROC-AUC may stay the same because sigmoid calibration preserves score ranking. "
+                        "Precision, recall and F1 can change at the fixed 0.5 decision threshold. "
+                        "Do not choose the threshold on this test set."
+                    )
+            except (OSError, KeyError, TypeError, ValueError) as error:
+                st.error(f"Calibration report could not be displayed: {error}")
+        else:
+            st.info(
+                "No full calibration experiment report found at "
+                "data/reports/rees46_calibration_full.json. "
+                "Run the full scripts.experiment_calibration command first."
+            )
 
 elif page == "Settings":
     st.title("System Settings")
