@@ -117,3 +117,35 @@ def suggested_review_action(band: str) -> str:
         "Moderate": "Monitor buying activity and review whether the customer could benefit from relevant product updates.",
         "Low": "Continue normal customer care; monitor for meaningful changes over time.",
     }.get(band, "Review the customer's history before deciding on an action.")
+
+
+def suggested_review_checks(shap_contributions, limit: int = 3) -> list[str]:
+    """Business review prompts from positive model attributions.
+
+    Each (feature, log_odds_contribution) is SHAP output. Positive influence
+    only signals model behaviour; these prompts are not causes or treatments.
+    """
+    prompts = {
+        "purchase": "Check the customer's recent orders and whether their buying pattern has changed.",
+        "session": "Review recent shopping visits and whether browsing activity has changed.",
+        "cart": "Review basket activity and whether a shopping journey was left unfinished.",
+        "revenue": "Check previous spending patterns and order values.",
+        "view": "Review which products the customer browsed and whether their interests have shifted.",
+        "product": "Review recent product browsing and whether displayed items remain relevant.",
+        "category": "Look at the product categories they usually explore.",
+        "interaction": "Review the customer's recent interactions with the online store.",
+    }
+    ordered = sorted(shap_contributions, key=lambda pair: float(pair[1]), reverse=True)
+    checks = []
+    for feature, contribution in ordered:
+        if float(contribution) <= 0:
+            continue
+        technical_name = str(feature).lower().replace("num__", "").replace("cat__", "")
+        matched = next((text for key, text in prompts.items() if key in technical_name), None)
+        if matched and matched not in checks:
+            checks.append(matched)
+        if len(checks) >= limit:
+            break
+    if not checks:
+        checks.append("Review recent orders, visits and customer-service history before deciding on a follow-up.")
+    return checks[:limit]
