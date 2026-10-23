@@ -55,8 +55,8 @@ page = st.sidebar.radio("Navigation", [
 st.sidebar.caption("Research prototype · REES46 · UiTM")
 
 if page == "Overview":
-    st.title("Understand customer inactivity before it happens")
-    st.caption("XGBoost + SHAP · Target: no platform interaction during the following month")
+    st.title("Understand who may not purchase again")
+    st.caption("XGBoost + SHAP · Target: no purchase during the following four weeks")
     if bundle is None:
         st.info("Train a model on your actual labelled REES46 dataset first, then upload an unlabelled cohort.")
     else:
@@ -77,7 +77,7 @@ if page == "Overview":
             with b:
                 st.subheader("Highest-risk customers")
                 st.dataframe(result.nlargest(8,"predicted_inactivity_risk"),hide_index=True,use_container_width=True)
-        st.caption("Scores are estimates, not guarantees. These are not predictions of permanent customer loss.")
+        st.caption("Scores are estimates, not guarantees. These are not predictions of permanent customer loss or website inactivity.")
 
 elif page == "Upload & Predict":
     st.title("Upload & Predict")
