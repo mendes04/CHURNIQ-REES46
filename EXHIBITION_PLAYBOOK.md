@@ -10,7 +10,7 @@
 - Keep a trusted offline copy of your trained pipeline, outside GitHub.
 
 ## Three-minute presentation
-1. Explain the business problem and exact target: no platform interaction in the **subsequent month**.
+1. Explain the business problem and exact target: no purchase in the **following four weeks**.
 2. Show the real model evaluation and what was optimised, without claiming tuned XGBoost necessarily wins.
 3. Upload a compatible, unlabelled customer dataset; run predictions.
 4. Search for a high-risk customer and show the actual local SHAP explanation.
