@@ -18,7 +18,7 @@ The proposal defines churn as **no interaction during the subsequent month** (la
 - `tests/test_pipeline.py` — regression tests
 - `EXHIBITION_PLAYBOOK.md` and `THESIS_CHAPTERS_4_5.md` — demonstration and academic evidence guides
 
-**Repository setup status:** The starter repository is being populated. Do not run the instructions until `app.py`, the `churniq/` package, and the scripts are present. Those source files are in the CHURNIQ ZIP supplied in ChatGPT and can be copied into your local clone.
+**Repository setup status:** The initial runnable source is committed. The GitHub-hosted `app.py` is a streamlined implementation of the exhibition interface; the earlier CHURNIQ ZIP contains a more extensively styled variant you can choose to integrate later. No real REES46 model has yet been trained here.
 
 ## Install on Windows
 
