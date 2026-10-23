@@ -18,6 +18,7 @@ from churniq.business import (
     readable_effect,
     readable_feature,
     suggested_review_action,
+    suggested_review_checks,
 )
 from churniq.data import load_csv
 from churniq.explain import explain, top_global, top_local
@@ -101,6 +102,12 @@ def show_customer_table(result, limit=None):
     return view
 
 
+def go_to(page_name, customer_index=None):
+    st.session_state["navigation_page"] = page_name
+    if customer_index is not None:
+        st.session_state["focused_customer_idx"] = int(customer_index)
+
+
 def run_customer_predictions(data, source_label, identifier=None):
     missing = [field for field in bundle["features"] if field not in data.columns]
     if missing:
@@ -142,6 +149,7 @@ page = st.sidebar.radio(
         "Research Lab",
         "Settings",
     ],
+    key="navigation_page",
 )
 if bundle is not None:
     st.sidebar.success("Prediction model ready")
@@ -224,6 +232,12 @@ if page == "Business Home":
             with right:
                 st.subheader("Customers to review first")
                 show_customer_table(result, limit=8)
+            st.button(
+                "Review the priority customer list →",
+                type="primary",
+                on_click=go_to, args=("Customer List",),
+                key="home_customer_list",
+            )
             st.caption(f"Customer data source: {st.session_state.get('prediction_source', 'This session')}")
             risk_note()
 
@@ -324,6 +338,25 @@ elif page == "Customer List":
         chosen = chosen.sort_values("Risk score (not calibrated)", ascending=False)
         st.caption(f"{len(chosen):,} matching customer records")
         st.dataframe(chosen, use_container_width=True, hide_index=True)
+        if not chosen.empty:
+            st.subheader("Understand one customer")
+            chosen_idx = st.selectbox(
+                "Choose a record to explain",
+                options=chosen.index.tolist(),
+                format_func=lambda idx: (
+                    f"{result.iloc[idx]['customer_id']} — "
+                    f"{display_priority(result.iloc[idx]['risk_band'])}, "
+                    f"score {result.iloc[idx]['predicted_no_purchase_risk_pct']:.1f}/100"
+                ),
+                key="list_explain_customer",
+            )
+            st.button(
+                "Show why this customer was flagged →",
+                on_click=go_to,
+                args=("Why Customers Are Flagged", int(chosen_idx)),
+                type="primary",
+                key="list_explain_button",
+            )
         st.download_button(
             "Download this customer list (CSV)",
             chosen.to_csv(index=False),
@@ -345,11 +378,13 @@ elif page == "Why Customers Are Flagged":
         selected = st.selectbox(
             "Choose a customer record",
             range(len(result)),
+            index=min(int(st.session_state.get("focused_customer_idx", 0)), len(result) - 1),
             format_func=lambda idx: (
                 f"{result.iloc[idx]['customer_id']} · "
                 f"{result.iloc[idx]['predicted_no_purchase_risk_pct']:.1f}/100 risk score"
             ),
         )
+        st.session_state["focused_customer_idx"] = int(selected)
         selected_row = result.iloc[selected]
         col1, col2 = st.columns(2)
         col1.metric("Risk score", f"{selected_row['predicted_no_purchase_risk_pct']:.1f} / 100")
@@ -371,6 +406,16 @@ elif page == "Why Customers Are Flagged":
             st.caption(
                 "An upward signal made the model's risk score higher; a downward signal "
                 "made it lower. This does not establish the cause of any customer's behaviour."
+            )
+            st.subheader("What could your team review next?")
+            review_prompts = suggested_review_checks(
+                list(zip(local["feature"], local["contribution_log_odds"]))
+            )
+            for prompt in review_prompts:
+                st.markdown("- " + prompt)
+            st.caption(
+                "These are suggested checks based on important model signals, "
+                "not proven reasons for not purchasing or guaranteed marketing solutions."
             )
             diagram = local.sort_values("contribution_log_odds").copy()
             diagram["Impact"] = diagram["contribution_log_odds"].map(
