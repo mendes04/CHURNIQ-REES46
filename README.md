@@ -1,6 +1,6 @@
-# CHURNIQ — Explainable E-Commerce Customer Inactivity Prediction
+# CHURNIQ — Customer Retention Intelligence for Online Stores
 
-Research prototype for the thesis **Explainable Customer Churn Prediction in E-Commerce Using XGBoost and SHAP**.
+Research prototype for the thesis **Explainable Customer Churn Prediction in E-Commerce Using XGBoost and SHAP**. The default Streamlit interface is designed for e-commerce operators, while Research Lab preserves the technical evidence needed by academic examiners.
 
 ## Research target
 
@@ -18,7 +18,34 @@ The proposal defines churn as **no purchase during the following four weeks** (l
 - `tests/test_pipeline.py` — regression tests
 - `EXHIBITION_PLAYBOOK.md` and `THESIS_CHAPTERS_4_5.md` — demonstration and academic evidence guides
 
-**Repository setup status:** The initial runnable source is committed. The GitHub-hosted `app.py` is a streamlined implementation of the exhibition interface; the earlier CHURNIQ ZIP contains a more extensively styled variant you can choose to integrate later. No real REES46 model has yet been trained here.
+**Current status:** The end-to-end workflow has been tested locally on REES46, including grouped customer holdout, four-model comparison, XGBoost tuning, individual/global SHAP, separate temporal evaluation and an exploratory sigmoid-calibration experiment. Model artifacts and customer-level records stay local; the GitHub repository contains code and tests, not your trained model or raw CSV.
+
+## Open the e-commerce dashboard (after local training)
+
+1. In GitHub Desktop, **Fetch origin → Pull origin**.
+2. In your activated environment, run `python -m pytest -q`.
+3. Ensure `artifacts/churniq_rees46.joblib` still contains the model you tested locally. Pulling source code does not remove your ignored model files.
+4. Start it with `python -m streamlit run app.py` and open <http://localhost:8501>.
+
+The business navigation is:
+
+- **Business Home** — simple attention-level summary for currently analysed customer records.
+- **Check Customers** — upload a *prepared* behaviour-feature CSV or use the local historical example.
+- **Customer List** — search, filter and export review-priority records.
+- **Why Customers Are Flagged** — readable purchasing/browsing feature names, with technical SHAP scores in an expander.
+- **Follow-up Planner** — human-review options, not automated or guaranteed retention outcomes.
+- **Research Lab** — scientific comparison, calibration-study report, future-period evaluation and full feature details.
+- **Settings** — explained demo risk bands, an advanced decision threshold and session cleanup.
+
+**Important business limitation:** This model requires precomputed behavioural features in the training schema (approximately 265 available original features). An ordinary Shopify/WooCommerce order-export CSV does **not** work directly. A real deployment would need an event/transaction-to-feature adapter and a consent/privacy review. The dashboard does not claim this integration exists.
+
+To generate a historical, held-out example file from the *same original training CSV*:
+
+```powershell
+python -m scripts.export_holdout_cohort --data "data/raw/rees46.csv" --model "artifacts/churniq_rees46.joblib" --output "data/sample/rees46_heldout_cohort.csv" --count 100 --period 0
+```
+
+The **Calibration study** and **Future-period test** tabs read local JSON reports, if present, from `data/reports/rees46_calibration_full.json` and `data/reports/rees46_temporal_full.json`. They describe *separate experiments* and do not change the model serving dashboard predictions. The displayed risk scores are not yet deployed as calibrated real-world probabilities.
 
 ## Install on Windows
 
