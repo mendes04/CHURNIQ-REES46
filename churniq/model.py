@@ -1,6 +1,6 @@
 """Reproducible training and prediction for the thesis's pre-labelled REES46 table.
 
-Important: class label 1 = no interaction during the subsequent month.
+Important: class label 1 = no purchase during the following four weeks.
 SMOTE and feature selection are INSIDE cross-validation pipelines.
 """
 from __future__ import annotations
@@ -21,7 +21,7 @@ from sklearn.metrics import (
     accuracy_score, average_precision_score, brier_score_loss, confusion_matrix,
     f1_score, precision_score, recall_score, roc_auc_score, roc_curve
 )
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split, learning_curve
+from sklearn.model_selection import (GridSearchCV, StratifiedKFold, StratifiedGroupKFold, GroupShuffleSplit, train_test_split, learning_curve)
 from sklearn.pipeline import Pipeline as SKPipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.ensemble import RandomForestClassifier
@@ -76,8 +76,25 @@ def train(df: pd.DataFrame, target: str, identifier: str | None = None,
     x, y, dropped = prepare_training_data(df, target, identifier)
     if y.value_counts().min() < cv * 4:
         raise ValueError("Not enough minority-class samples for safe CV/SMOTE; reduce folds or use more records.")
-    xtrain, xtest, ytrain, ytest = train_test_split(
-        x, y, test_size=0.20, random_state=SEED, stratify=y)
+    if identifier is None and "user_id" in df.columns:
+        raise ValueError("REES46 has repeated customers; supply --id user_id for a group-safe split.")
+    group_train = None
+    if identifier is not None:
+        groups = df[identifier].astype(str)
+        if groups.nunique() < cv * 2:
+            raise ValueError("Insufficient unique customers for grouped validation.")
+        indices = GroupShuffleSplit(n_splits=1, test_size=0.20, random_state=SEED)
+        train_idx, test_idx = next(indices.split(x, y, groups=groups))
+        xtrain, xtest = x.iloc[train_idx], x.iloc[test_idx]
+        ytrain, ytest = y.iloc[train_idx], y.iloc[test_idx]
+        group_train = groups.iloc[train_idx]
+        if set(groups.iloc[train_idx]).intersection(set(groups.iloc[test_idx])):
+            raise AssertionError("Customer overlap between training and holdout.")
+    else:
+        xtrain, xtest, ytrain, ytest = train_test_split(
+            x, y, test_size=0.20, random_state=SEED, stratify=y)
+    if ytrain.nunique() < 2 or ytest.nunique() < 2 or ytrain.value_counts().min() < cv * 4:
+        raise ValueError("Grouped split lacks enough records in each class. Inspect the target distribution before training.")
     estimators = {
         "Logistic Regression": LogisticRegression(max_iter=1200, random_state=SEED),
         "Random Forest": RandomForestClassifier(n_estimators=70 if fast else 180, random_state=SEED, n_jobs=-1),
@@ -88,7 +105,9 @@ def train(df: pd.DataFrame, target: str, identifier: str | None = None,
     scores = {}
     fitted = {}
     best_parameters = {}
-    splitter = StratifiedKFold(n_splits=cv, shuffle=True, random_state=SEED)
+    splitter = (StratifiedGroupKFold(n_splits=cv, shuffle=True, random_state=SEED)
+                if group_train is not None else
+                StratifiedKFold(n_splits=cv, shuffle=True, random_state=SEED))
     for name, estimator in estimators.items():
         pipe, numeric, cats = _pipeline(xtrain, estimator, max_features)
         if name == "Tuned XGBoost":
@@ -99,7 +118,7 @@ def train(df: pd.DataFrame, target: str, identifier: str | None = None,
                                   "model__subsample": [0.85]})
             search = GridSearchCV(pipe, grid, scoring="f1", cv=splitter, n_jobs=1,
                                   refit=True, error_score="raise")
-            search.fit(xtrain, ytrain)
+            search.fit(xtrain, ytrain, **({'groups': group_train} if group_train is not None else {}))
             pipe = search.best_estimator_
             best_parameters = {k.replace("model__", ""): v for k, v in search.best_params_.items()}
             best_parameters["cross_validation_f1"] = float(search.best_score_)
@@ -117,7 +136,7 @@ def train(df: pd.DataFrame, target: str, identifier: str | None = None,
         train_sizes, train_scores, val_scores = learning_curve(
             model, xtrain, ytrain, train_sizes=[0.3, 0.5, 0.75, 1.0],
             scoring="f1", cv=splitter, n_jobs=1, shuffle=True, random_state=SEED,
-            error_score=np.nan)
+            error_score=np.nan, **({"groups": group_train} if group_train is not None else {}))
         learning = {"train_sizes": train_sizes.tolist(),
                     "train_f1": np.nanmean(train_scores,axis=1).tolist(),
                     "validation_f1": np.nanmean(val_scores,axis=1).tolist()}
@@ -125,7 +144,7 @@ def train(df: pd.DataFrame, target: str, identifier: str | None = None,
         "learning_curve": learning,
         "training_class_counts_before_smote": {str(k):int(v) for k,v in ytrain.value_counts().items()},
         "trained_at_utc": datetime.now(timezone.utc).isoformat(),
-        "project_target_definition": "1 = no interaction in subsequent month; 0 = returned",
+        "project_target_definition": "1 = no purchase in following four weeks; 0 = purchased",
         "source_rows": int(len(df)),
         "train_rows": int(len(xtrain)),
         "test_rows": int(len(xtest)),
@@ -141,9 +160,10 @@ def train(df: pd.DataFrame, target: str, identifier: str | None = None,
         "best_by_test_f1": max(scores, key=lambda k: scores[k]["f1"]),
         "best_params": best_parameters,
         "scores": scores,
-        "split": "80/20 stratified random holdout; CV limited to training set",
+        "split": ("80/20 of unique customer IDs, disjoint across train/test; grouped CV on training records" if group_train is not None else "80/20 stratified random holdout; CV on training records"),
+        "unique_train_customers": int(group_train.nunique()) if group_train is not None else None,
         "cv_folds": cv,
-        "warning": "The held-out test set must NOT be used repeatedly for model/threshold selection. Confirm time boundaries and customer overlap.",
+        "warning": "Do not tune against the final test set. Grouped validation does not establish future-period robustness; separately evaluate temporal holdout on REES46."
     }
     roc = {}
     for key, pipe in fitted.items():
