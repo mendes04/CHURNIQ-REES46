@@ -23,7 +23,7 @@ def main():
     identifier=a.id or suggest_column(df.columns,ID_ALIASES)
     if not target:raise ValueError("No obvious target found. Supply --target exactly as named in CSV.")
     print(f"Rows: {len(df):,} | Columns: {len(df.columns)} | Target: {target} | ID: {identifier}")
-    print("Confirm label 1 means no subsequent-month interaction and 0 means returned.")
+    print("Confirm label 1 means no purchase in the following four weeks and 0 means purchased.")
     artifact=train(df,target,identifier,fast=a.fast,cv=a.cv,max_features=a.features)
     path=save(artifact,a.output)
     print(f"Model saved to: {path}")
