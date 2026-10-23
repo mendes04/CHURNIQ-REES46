@@ -16,7 +16,7 @@ def test_train_infer_explain():
     batch=df.drop(columns=["churn"]).head(8)
     out=predict(artifact,batch,id_column="customer_id")
     assert len(out)==8
-    assert out["predicted_inactivity_risk"].between(0,1).all()
+    assert out["predicted_no_purchase_risk"].between(0,1).all()
     explanation=explain(artifact,batch.head(2))
     assert explanation["values"].shape[0]==2
     assert len(top_local(explanation,0))>0
