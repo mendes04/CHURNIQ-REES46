@@ -190,10 +190,13 @@ if page == "Business Home":
             c4.metric("Average risk score", f"{result['predicted_no_purchase_risk'].mean():.0%}", help="A model score, not a calibrated probability.")
             if unique_customers != total:
                 st.caption(f"These {total:,} records represent {unique_customers:,} different customers.")
-            st.success(
-                f"{high:,} of {total:,} customer records are in the highest review-priority group. "
-                "Review their history before contacting anyone."
-            ) if high else st.info("No customers are in the highest review-priority group in this file.")
+            if high:
+                st.success(
+                    f"{high:,} of {total:,} customer records are in the highest review-priority group. "
+                    "Review their history before contacting anyone."
+                )
+            else:
+                st.info("No customers are in the highest review-priority group in this file.")
             left, right = st.columns([1, 1.3])
             with left:
                 st.subheader("Where to focus")
