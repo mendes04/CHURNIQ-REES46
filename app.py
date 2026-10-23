@@ -68,7 +68,7 @@ if page == "Overview":
             c1.metric("Customers analysed",f"{len(result):,}")
             c2.metric("High-risk customers",f"{(result.risk_band=='High').sum():,}")
             c3.metric("Moderate-risk customers",f"{(result.risk_band=='Moderate').sum():,}")
-            c4.metric("Average risk score",f"{result.predicted_inactivity_risk.mean():.1%}")
+            c4.metric("Average risk score",f"{result.predicted_no_purchase_risk.mean():.1%}")
             a,b=st.columns(2)
             with a:
                 distribution=result.risk_band.value_counts().reindex(["Low","Moderate","High"],fill_value=0)
@@ -76,7 +76,7 @@ if page == "Overview":
                                     color=distribution.index,color_discrete_map={"Low":"#1ed6b0","Moderate":"#f8bb6e","High":"#ff6d91"}),use_container_width=True)
             with b:
                 st.subheader("Highest-risk customers")
-                st.dataframe(result.nlargest(8,"predicted_inactivity_risk"),hide_index=True,use_container_width=True)
+                st.dataframe(result.nlargest(8,"predicted_no_purchase_risk"),hide_index=True,use_container_width=True)
         st.caption("Scores are estimates, not guarantees. These are not predictions of permanent customer loss or website inactivity.")
 
 elif page == "Upload & Predict":
@@ -117,7 +117,7 @@ elif page == "Customer Explorer":
         filtered=result[result.risk_band.isin(band)]
         if query:
             filtered=filtered[filtered.customer_id.str.contains(query,case=False,regex=False)]
-        st.dataframe(filtered.sort_values("predicted_inactivity_risk",ascending=False),
+        st.dataframe(filtered.sort_values("predicted_no_purchase_risk",ascending=False),
                      hide_index=True,use_container_width=True)
         st.download_button("Export predictions",result.to_csv(index=False),file_name="churniq_predictions.csv",mime="text/csv")
 
@@ -127,7 +127,7 @@ elif page == "Explainable AI":
     if bundle is not None and result is not None:
         st.info("SHAP explains contribution to the XGBoost model score, not the cause of a customer's actual behaviour.")
         choice=st.selectbox("Select customer",range(len(result)),
-                            format_func=lambda i:f"{result.iloc[i].customer_id} — {result.iloc[i].predicted_inactivity_risk_pct:.1f}%")
+                            format_func=lambda i:f"{result.iloc[i].customer_id} — {result.iloc[i].predicted_no_purchase_risk_pct:.1f}%")
         try:
             sample=raw.iloc[[choice]]
             detail=explain(bundle,sample,max_rows=1)
@@ -137,7 +137,7 @@ elif page == "Explainable AI":
                        color="contribution_log_odds",color_continuous_scale="RdBu_r",
                        labels={"contribution_log_odds":"SHAP contribution (log-odds)","name":"Behavioural feature"})
             st.plotly_chart(fig,use_container_width=True)
-            st.caption("Positive SHAP values increase the model's inactivity risk score; negative values decrease it.")
+            st.caption("Positive SHAP values increase the model's non-purchase risk score; negative values decrease it.")
             with st.expander("Global feature importance (sample of uploaded customers)"):
                 global_exp=explain(bundle,raw,max_rows=min(150,len(raw)))
                 importance=top_global(global_exp)
@@ -150,7 +150,7 @@ elif page == "Retention Planner":
     st.title("Customers for retention review")
     result,_=require_predictions()
     if result is not None:
-        priority=result[result.risk_band=="High"].sort_values("predicted_inactivity_risk",ascending=False)
+        priority=result[result.risk_band=="High"].sort_values("predicted_no_purchase_risk",ascending=False)
         st.metric("High-risk customers",len(priority))
         st.dataframe(priority,hide_index=True,use_container_width=True)
         st.download_button("Download shortlist",priority.to_csv(index=False),file_name="churniq_review.csv",mime="text/csv")
