@@ -23,6 +23,7 @@ from churniq.business import (
 from churniq.data import load_csv
 from churniq.explain import explain, top_global, top_local
 from churniq.model import load, predict
+from churniq.store_orders import suggest_order_columns, summarize_orders
 
 
 ROOT = Path(__file__).parent
@@ -142,6 +143,7 @@ page = st.sidebar.radio(
     "Go to",
     [
         "Business Home",
+        "Store Orders (Preview)",
         "Check Customers",
         "Customer List",
         "Why Customers Are Flagged",
@@ -175,7 +177,7 @@ if page == "Business Home":
             a, b, c = st.columns(3)
             with a:
                 st.markdown("#### 1. Prepare customer data")
-                st.write("Use a file of historical shopping and purchase-activity measures.")
+                st.write("Use **Store Orders** for a normal orders CSV, or prepare the activity features required for model predictions.")
             with b:
                 st.markdown("#### 2. Check customer risk")
                 st.write("Open **Check Customers** and let CHURNIQ analyse the records.")
@@ -241,6 +243,189 @@ if page == "Business Home":
             st.caption(f"Customer data source: {st.session_state.get('prediction_source', 'This session')}")
             risk_note()
 
+
+
+elif page == "Store Orders (Preview)":
+    title_block(
+        "YOUR STORE'S ORDER HISTORY",
+        "Understand your customers from an orders CSV",
+        "Upload ordinary transaction data to see repeat buyers, spending and customers "
+        "who have not placed an order recently. No AI setup or feature engineering needed for this view.",
+    )
+    st.info(
+        "**Order-history insights only.** This page does not use CHURNIQ's "
+        "four-week prediction model, calculate customer churn probabilities, "
+        "or predict whether someone will purchase again."
+    )
+    example_csv = (
+        "customer_id,order_id,order_date,order_total\\n"
+        "C001,O100,2026-09-04,120.50\\n"
+        "C001,O101,2026-10-09,74.00\\n"
+        "C002,O102,2026-08-23,39.90\\n"
+        "C003,O103,2026-10-10,54.00\\n"
+    ).replace("\\\\n", "\\n")
+    st.download_button(
+        "Download sample order CSV",
+        data=example_csv,
+        file_name="churniq_example_orders.csv",
+        mime="text/csv",
+    )
+    orders_upload = st.file_uploader(
+        "Upload orders CSV (one row per order or one row per item)",
+        type=["csv"], key="store_orders_upload",
+    )
+    st.caption(
+        "Use a paid/completed order export. Cancelled, refunded or test orders "
+        "are not filtered automatically. Data stays in this Streamlit session."
+    )
+    if orders_upload is not None:
+        try:
+            orders_df = load_csv(orders_upload)
+            suggestions = suggest_order_columns(orders_df.columns)
+            column_names = orders_df.columns.tolist()
+            st.write(f"File: **{orders_upload.name}** · {len(orders_df):,} transaction rows")
+            with st.expander("Preview the imported columns"):
+                st.dataframe(orders_df.head(5), hide_index=True, use_container_width=True)
+
+            def column_index(field):
+                value = suggestions.get(field)
+                return column_names.index(value) if value in column_names else 0
+
+            with st.form("analyse_store_orders"):
+                st.markdown("#### Match the columns in your file")
+                st.caption("Most fields are detected automatically. Please confirm them before analysing.")
+                left, right = st.columns(2)
+                with left:
+                    customer_col = st.selectbox(
+                        "Customer identifier", column_names,
+                        index=column_index("customer"),
+                        help="A customer ID or customer email; required to group orders by person.",
+                    )
+                    order_options = ["Each row is an individual order"] + column_names
+                    order_guess = suggestions.get("order")
+                    order_col_choice = st.selectbox(
+                        "Order number or ID", order_options,
+                        index=order_options.index(order_guess) if order_guess in order_options else 0,
+                        help="Important when a single order has multiple item rows. "
+                        "Without an order ID, each row is treated as a separate order.",
+                    )
+                with right:
+                    date_col = st.selectbox(
+                        "Date the order was placed", column_names,
+                        index=column_index("date"),
+                    )
+                    amount_options = ["Ignore order amounts"] + column_names
+                    amount_guess = suggestions.get("amount")
+                    amount_col_choice = st.selectbox(
+                        "Order value (optional)", amount_options,
+                        index=amount_options.index(amount_guess) if amount_guess in amount_options else 0,
+                    )
+                amount_kind = st.radio(
+                    "How is order value recorded?",
+                    ["Order total (may repeat for each item)", "One amount per line item (add together)"],
+                    horizontal=True,
+                    help="For Shopify-style exports where order Total repeats across lines, "
+                    "choose the first option. For line-item subtotals, choose the second.",
+                )
+                inactivity_days = st.slider(
+                    "Count customers with no orders for at least this many days",
+                    7, 180, 30, step=1,
+                    help="This is a descriptive filter, not a prediction of future behaviour.",
+                )
+                try:
+                    parsed_dates = pd.to_datetime(
+                        orders_df[date_col], errors="coerce", utc=True, format="mixed"
+                    )
+                    latest_order_date = parsed_dates.max().date() if parsed_dates.notna().any() else None
+                except (ValueError, TypeError):
+                    latest_order_date = None
+                if latest_order_date is not None:
+                    as_of_date = st.date_input(
+                        "Measure activity as of",
+                        value=latest_order_date,
+                        min_value=latest_order_date,
+                        help="Defaults to the latest order date in your file, "
+                        "so historical exports are not mistaken for current activity.",
+                    )
+                else:
+                    as_of_date = None
+                    st.warning("The date column could not be interpreted. Check the column mapping.")
+                submitted = st.form_submit_button(
+                    "Analyse order history", type="primary",
+                    disabled=as_of_date is None,
+                )
+            if submitted:
+                report_df, report_meta = summarize_orders(
+                    orders_df,
+                    customer_col=customer_col,
+                    date_col=date_col,
+                    order_col=None if order_col_choice == order_options[0] else order_col_choice,
+                    amount_col=None if amount_col_choice == amount_options[0] else amount_col_choice,
+                    amount_type="order_total" if amount_kind.startswith("Order total") else "line_total",
+                    reference_date=as_of_date,
+                    inactive_days=inactivity_days,
+                )
+                st.session_state.store_orders_summary = report_df
+                st.session_state.store_orders_metadata = report_meta
+                st.session_state.store_orders_filename = orders_upload.name
+                st.success("Order history analysed. These are observed facts, not AI predictions.")
+        except Exception as error:
+            st.error(f"Unable to read or analyse this orders file: {error}")
+
+    store_summary = st.session_state.get("store_orders_summary")
+    store_meta = st.session_state.get("store_orders_metadata")
+    if store_summary is not None and store_meta is not None:
+        st.divider()
+        st.subheader("Your store's buying activity")
+        st.caption(
+            f"Source: {st.session_state.get('store_orders_filename', 'Uploaded file')} · "
+            f"As of {store_meta['reference_date']} · "
+            f"Recent activity means an order within {store_meta['inactive_days']} days"
+        )
+        first, second, third = st.columns(3)
+        first.metric("Customers in file", f"{store_meta['customers']:,}")
+        second.metric("Orders counted", f"{store_meta['orders']:,}")
+        third.metric(
+            f"No order in {store_meta['inactive_days']}+ days",
+            f"{store_meta['customers_without_recent_order']:,}",
+        )
+        if store_meta["has_amount"]:
+            st.metric(
+                "Order value in file (same currency as upload)",
+                f"{store_summary['Total order value'].sum():,.2f}",
+            )
+        if store_meta["no_order_id"]:
+            st.warning(
+                "No order ID was selected, so CHURNIQ counted each transaction row as a separate order. "
+                "This can overcount orders when an export has multiple rows per order."
+            )
+        st.caption(
+            "The values include all uploaded rows. Remove cancelled, refunded and test orders "
+            "before importing if they should not count as purchases. "
+            "Use a single currency when interpreting order totals."
+        )
+        plot = px.histogram(
+            store_summary, x="Days since last order", nbins=20,
+            title="How long has it been since customers last ordered?",
+            labels={"Days since last order": "Days since latest recorded order"},
+            template="plotly_dark",
+        )
+        plot.update_layout(yaxis_title="Number of customers")
+        st.plotly_chart(plot, use_container_width=True)
+        st.subheader("Customers who have not ordered recently")
+        review = store_summary[
+            store_summary["Days since last order"] >= store_meta["inactive_days"]
+        ]
+        st.dataframe(review.head(100), hide_index=True, use_container_width=True)
+        st.download_button(
+            "Download order-history summary",
+            store_summary.to_csv(index=False),
+            file_name="churniq_store_order_summary.csv", mime="text/csv",
+        )
+        st.caption(
+            "This identifies past ordering behaviour only. It cannot tell you "
+            "whether a customer will make a purchase in the next four weeks."
+        )
 
 elif page == "Check Customers":
     title_block(
