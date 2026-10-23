@@ -23,7 +23,7 @@ def explain(artifact, raw: pd.DataFrame, max_rows: int = 300):
         expected = np.repeat(float(expected), len(vals))
     return {"values": vals, "base_values": expected,
             "feature_values": selected, "feature_names": artifact["selected_names"],
-            "units": "log-odds (positive raises inactivity risk)"}
+            "units": "log-odds (positive raises four-week non-purchase risk)"}
 
 
 def top_local(shap_result, index: int, limit: int = 12):
