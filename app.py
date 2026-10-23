@@ -1,4 +1,4 @@
-"""CHURNIQ Streamlit dashboard: thesis-aligned next-month inactivity predictions."""
+"""CHURNIQ Streamlit dashboard: four-week non-purchase predictions."""
 from pathlib import Path
 
 import numpy as np
@@ -47,7 +47,10 @@ def require_predictions():
 bundle = artifact()
 st.sidebar.title("◈ CHURNIQ")
 st.sidebar.caption("EXPLAINABLE CUSTOMER INTELLIGENCE")
-st.sidebar.success("Trained model loaded") if bundle else st.sidebar.warning("Model not trained")
+if bundle is not None:
+    st.sidebar.success("Trained model loaded")
+else:
+    st.sidebar.warning("Model not trained")
 page = st.sidebar.radio("Navigation", [
     "Overview", "Upload & Predict", "Customer Explorer",
     "Explainable AI", "Retention Planner", "Research Lab", "Settings"
@@ -179,7 +182,7 @@ elif page == "Research Lab":
             try:
                 df=load_csv(upload)
                 target_guess=suggest_column(df.columns,TARGET_ALIASES)
-                target=st.selectbox("Next-month target column",df.columns.tolist(),
+                target=st.selectbox("Four-week non-purchase target column",df.columns.tolist(),
                                     index=df.columns.get_loc(target_guess) if target_guess else 0)
                 ident=st.selectbox("Customer ID",["None"]+[c for c in df.columns if c!=target])
                 fast=st.checkbox("Fast smoke test (NOT thesis experiment)",value=False)
