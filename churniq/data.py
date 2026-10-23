@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 
 TARGET_ALIASES = ("churn", "target_class", "target", "label", "is_churn", "churned")
-ID_ALIASES = ("visitorid", "customer_id", "customerid", "user_id", "userid", "id")
+ID_ALIASES = ("visitorid", "customer_id", "customerid", "user_id", "userid", "id", "row_id", "rowid", "record_id")
 DANGEROUS_TOKENS = ("future_", "next_month", "next_30", "subsequent", "target_", "label_", "churn_probability", "predicted_")
 
 
@@ -34,7 +34,7 @@ def validate_target(df: pd.DataFrame, target: str) -> pd.Series:
         raise ValueError("Training target has missing labels: remove or resolve these records first.")
     y = pd.to_numeric(df[target], errors="coerce")
     if y.isna().any() or not set(y.unique()).issubset({0, 1}):
-        raise ValueError("The target must be binary: 1 = no interaction next month; 0 = returned.")
+        raise ValueError("The target must be binary: 1 = no purchase in the following four weeks; 0 = purchased.")
     if y.nunique() != 2 or y.value_counts().min() < 5:
         raise ValueError("Both classes must contain at least five records.")
     return y.astype(int)
@@ -53,7 +53,7 @@ def prepare_training_data(df: pd.DataFrame, target: str, identifier: str | None 
             exclude.add(col)
         if col != identifier and name in ID_ALIASES:
             exclude.add(col)
-        if any(part in name for part in DANGEROUS_TOKENS):
+        if any(part in name for part in DANGEROUS_TOKENS) or name == "time_step":
             exclude.add(col)
     x = df.drop(columns=sorted(exclude)).copy()
     dropped = list(sorted(exclude - {target}))
