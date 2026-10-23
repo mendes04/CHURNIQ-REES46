@@ -30,6 +30,7 @@ The proposal defines churn as **no purchase during the following four weeks** (l
 The business navigation is:
 
 - **Business Home** — simple attention-level summary for currently analysed customer records.
+- **Store Orders (Preview)** — upload an ordinary paid/completed orders CSV, map customer/order/date/optional amount columns, inspect recency, total sales and repeat purchasing, and export a customer-level activity table. This is **descriptive** and does not produce four-week predictions.
 - **Check Customers** — upload a *prepared* behaviour-feature CSV or use the local historical example.
 - **Customer List** — search, filter and export review-priority records.
 - **Why Customers Are Flagged** — readable purchasing/browsing feature names, with technical SHAP scores in an expander.
@@ -37,7 +38,13 @@ The business navigation is:
 - **Research Lab** — scientific comparison, calibration-study report, future-period evaluation and full feature details.
 - **Settings** — explained demo risk bands, an advanced decision threshold and session cleanup.
 
-**Important business limitation:** This model requires precomputed behavioural features in the training schema (approximately 265 available original features). An ordinary Shopify/WooCommerce order-export CSV does **not** work directly. A real deployment would need an event/transaction-to-feature adapter and a consent/privacy review. The dashboard does not claim this integration exists.
+**Important business limitation:** The existing REES46 XGBoost model still requires precomputed behavioural features in its original training schema (approximately 265 available original features). Ordinary Shopify/WooCommerce order exports **can now be analysed descriptively** on the Store Orders page, but **cannot yet be used to produce XGBoost four-week risk predictions**. Real predictive support would require a matching feature-engineering pipeline or a separate appropriately trained and evaluated orders-only model, as well as permission/privacy review. CHURNIQ does not claim an automated platform integration exists.
+
+### Store Orders example
+
+Click **Store Orders (Preview) → Download sample order CSV**, then upload that sample. Column mapping should automatically identify `customer_id`, `order_id`, `order_date` and `order_total`. Check each mapping before analysis. If an export has one row per item and repeats the full order total on each row, choose **Order total (may repeat for each item)** to avoid double counting. If it contains each item's individual value, choose **One amount per line item (add together)** instead.
+
+The date cutoff defaults to the latest order in the file. Labels such as **No order in 30+ days** describe observed ordering history as of that date; they are **not predictions**. The analyser does not automatically exclude refunded, cancelled or test orders or handle mixed currencies. Clean the export first. Store data is processed in your local Streamlit process and must not be committed to GitHub.
 
 To generate a historical, held-out example file from the *same original training CSV*:
 
