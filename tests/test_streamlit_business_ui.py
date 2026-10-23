@@ -18,7 +18,7 @@ def test_business_pages_render_without_private_model():
 
     navigation = app.sidebar.radio[0]
     pages = [
-        "Business Home", "Check Customers", "Customer List",
+        "Business Home", "Store Orders (Preview)", "Check Customers", "Customer List",
         "Why Customers Are Flagged", "Follow-up Planner",
         "Research Lab", "Settings",
     ]
