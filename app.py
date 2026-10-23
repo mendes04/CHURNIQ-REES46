@@ -258,12 +258,12 @@ elif page == "Store Orders (Preview)":
         "or predict whether someone will purchase again."
     )
     example_csv = (
-        "customer_id,order_id,order_date,order_total\\n"
-        "C001,O100,2026-09-04,120.50\\n"
-        "C001,O101,2026-10-09,74.00\\n"
-        "C002,O102,2026-08-23,39.90\\n"
-        "C003,O103,2026-10-10,54.00\\n"
-    ).replace("\\\\n", "\\n")
+        "customer_id,order_id,order_date,order_total\n"
+        "C001,O100,2026-09-04,120.50\n"
+        "C001,O101,2026-10-09,74.00\n"
+        "C002,O102,2026-08-23,39.90\n"
+        "C003,O103,2026-10-10,54.00\n"
+    )
     st.download_button(
         "Download sample order CSV",
         data=example_csv,
