@@ -4,7 +4,7 @@ import pytest
 
 from churniq.business import (
     display_predictions, display_priority, readable_effect,
-    readable_feature, suggested_review_action,
+    readable_feature, suggested_review_action, suggested_review_checks,
 )
 
 
@@ -36,3 +36,17 @@ def test_nontechnical_shap_signal_labels():
 def test_missing_prediction_field_rejected():
     with pytest.raises(ValueError, match="missing"):
         display_predictions(pd.DataFrame({"customer_id": ["1"]}))
+
+
+def test_shap_driven_review_focus_does_not_invent_causes():
+    checks = suggested_review_checks([
+        ("num__session_recency_min", 2.2),
+        ("num__purchase_number_mean", 0.7),
+        ("num__session_count_month_lag0", 0.3),
+        ("num__cart_count_month_lag0", -1.4),
+    ])
+    assert len(checks) == 2
+    assert "shopping visits" in checks[0].lower()
+    assert "orders" in checks[1].lower()
+    assert not any("caused" in check.lower() for check in checks)
+    assert suggested_review_checks([("num__purchase_number_mean", -0.2)])
