@@ -4,7 +4,7 @@ Research prototype for the thesis **Explainable Customer Churn Prediction in E-C
 
 ## Research target
 
-The proposal defines churn as **no interaction during the subsequent month** (label `1`), as opposed to return during that month (label `0`). Prediction requires historical behavioural features, never the future target.
+The proposal defines churn as **no purchase during the following four weeks** (label `1`), as opposed to a purchase during those four weeks (label `0`). Prediction requires historical behavioural features, never the future target.
 
 ## Architecture
 
@@ -47,7 +47,7 @@ python -m pytest -q
 
 ## Data and model safety
 
-The target must not be present during inference. Review possible time leakage and repeated-customer overlap. Keep preprocessing and SMOTE inside CV training folds. The held-out test set must remain untouched until evaluation. Never load an untrusted joblib/pickle file. Do not claim synthetic results are actual REES46 results.
+The target must not be present during inference. Review possible time leakage and repeated-customer overlap. Keep preprocessing and SMOTE inside CV training folds. The held-out test set must remain untouched until evaluation. Group-splitting by `user_id` is now used when an identifier is supplied. This is not a substitute for an additional forward-in-time robustness evaluation using `time_step`. Never load an untrusted joblib/pickle file. Do not claim synthetic results are actual REES46 results.
 
 ## Source
 
