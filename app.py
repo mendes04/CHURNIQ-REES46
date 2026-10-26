@@ -24,6 +24,7 @@ from churniq.data import load_csv
 from churniq.explain import explain, top_global, top_local
 from churniq.model import load, predict
 from churniq.store_orders import suggest_order_columns, summarize_orders
+from churniq.order_readiness import canonical_orders, assess_prediction_readiness
 
 
 ROOT = Path(__file__).parent
@@ -368,6 +369,19 @@ elif page == "Store Orders (Preview)":
                 st.session_state.store_orders_summary = report_df
                 st.session_state.store_orders_metadata = report_meta
                 st.session_state.store_orders_filename = orders_upload.name
+                try:
+                    historical_events = canonical_orders(
+                        orders_df,
+                        customer_col=customer_col,
+                        order_col=None if order_col_choice == order_options[0] else order_col_choice,
+                        date_col=date_col,
+                    )
+                    readiness, historical_examples = assess_prediction_readiness(historical_events)
+                    st.session_state.store_orders_readiness = readiness
+                    st.session_state.store_orders_examples = historical_examples
+                except (ValueError, KeyError, TypeError) as error:
+                    st.session_state.store_orders_readiness = {"error": str(error)}
+                    st.session_state.store_orders_examples = None
                 st.success("Order history analysed. These are observed facts, not AI predictions.")
         except Exception as error:
             st.error(f"Unable to read or analyse this orders file: {error}")
@@ -426,6 +440,58 @@ elif page == "Store Orders (Preview)":
             "This identifies past ordering behaviour only. It cannot tell you "
             "whether a customer will make a purchase in the next four weeks."
         )
+        st.divider()
+        st.subheader("Is this order history ready for AI predictions?")
+        st.write(
+            "A real four-week prediction model needs enough **older purchases** to learn from "
+            "and **later purchases** to check its answers. We check whether your file could "
+            "support that type of experiment; this page does not train or apply a model."
+        )
+        readiness = st.session_state.get("store_orders_readiness")
+        if readiness is None:
+            st.info("Run the order-history analysis above to inspect training readiness.")
+        elif "error" in readiness:
+            st.warning(f"Training-readiness check could not be completed: {readiness['error']}")
+        else:
+            left, middle, right = st.columns(3)
+            left.metric("Order history", f"{readiness['history_days']} days")
+            middle.metric("Distinct buyers", f"{readiness['unique_customers']:,}")
+            right.metric("Historical training records", f"{readiness['eligible_customer_periods']:,}")
+            if readiness["passes_basic_checks"]:
+                st.success(
+                    "This file passes the initial size and history checks. "
+                    "A separately validated model-training procedure is still required."
+                )
+            else:
+                st.warning(
+                    "Not enough evidence to train a reliable four-week prediction model from this file yet. "
+                    "Use a longer paid-order export with more customers and repeat purchases."
+                )
+            for criterion, passed in readiness["minimum_checks"].items():
+                marker = "✓" if passed else "✗"
+                st.write(f"{marker} {criterion}")
+            with st.expander("How future-purchase examples would be prepared"):
+                st.write(
+                    "At each historical checkpoint, CHURNIQ would calculate order counts and "
+                    "how recently each customer bought using **only past orders**. "
+                    "It would then inspect the next 28 days to label whether a purchase occurred. "
+                    "The resulting labels are for retrospective training, not predictions."
+                )
+                st.write(
+                    f"Examples with no order in the following four weeks: "
+                    f"{readiness['examples_no_future_purchase']:,}. "
+                    f"Examples with an order: {readiness['examples_with_future_purchase']:,}."
+                )
+                examples = st.session_state.get("store_orders_examples")
+                if examples is not None and not examples.empty:
+                    st.dataframe(examples.head(10), hide_index=True, use_container_width=True)
+            st.caption(
+                "These checks are illustrative, not a validation certificate. "
+                "The store must confirm that the export covers every paid order for the "
+                "complete 28-day future window; the last order date alone cannot prove that. "
+                "Cancelled and refunded orders must be filtered correctly. "
+                "No REES46 XGBoost model or calibrated probability is applied to these rows."
+            )
 
 elif page == "Check Customers":
     title_block(
