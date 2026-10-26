@@ -30,7 +30,7 @@ The proposal defines churn as **no purchase during the following four weeks** (l
 The business navigation is:
 
 - **Business Home** — simple attention-level summary for currently analysed customer records.
-- **Store Orders (Preview)** — upload an ordinary paid/completed orders CSV, map customer/order/date/optional amount columns, inspect recency, total sales and repeat purchasing, and export a customer-level activity table. This is **descriptive** and does not produce four-week predictions.
+- **Store Orders (Preview)** — upload an ordinary paid/completed orders CSV, inspect recency, sales and repeat purchasing, export an activity table, and review whether enough historical transactions exist to prepare four-week supervised learning examples. This is **descriptive and preparatory**, not a trained prediction system.
 - **Check Customers** — upload a *prepared* behaviour-feature CSV or use the local historical example.
 - **Customer List** — search, filter and export review-priority records.
 - **Why Customers Are Flagged** — readable purchasing/browsing feature names, with technical SHAP scores in an expander.
@@ -44,7 +44,9 @@ The business navigation is:
 
 Click **Store Orders (Preview) → Download sample order CSV**, then upload that sample. Column mapping should automatically identify `customer_id`, `order_id`, `order_date` and `order_total`. Check each mapping before analysis. If an export has one row per item and repeats the full order total on each row, choose **Order total (may repeat for each item)** to avoid double counting. If it contains each item's individual value, choose **One amount per line item (add together)** instead.
 
-The date cutoff defaults to the latest order in the file. Labels such as **No order in 30+ days** describe observed ordering history as of that date; they are **not predictions**. The analyser does not automatically exclude refunded, cancelled or test orders or handle mixed currencies. Clean the export first. Store data is processed in your local Streamlit process and must not be committed to GitHub.
+The date cutoff defaults to the latest order in the file. Labels such as **No order in 30+ days** describe observed ordering history as of that date; they are **not predictions**.
+
+The **Is this order history ready for AI predictions?** section applies clearly labelled, illustrative screening criteria: at least 12 weeks between earliest and latest order, 1,000 orders, 200 customers, three historical snapshots, and 50 labelled examples of each outcome. These are pragmatic sanity checks, **not statistically certified minimums**. The four-order example correctly fails. Candidate features are computed strictly before each retrospective snapshot; its target checks purchases during the 28 days following that snapshot. It does not train a model, establish sufficient future coverage, or transfer the existing REES46 pipeline to store orders. For trustworthy order-only prediction, a new modelling and chronological validation experiment must be designed and trained on richer, complete historical orders. The analyser does not automatically exclude refunded, cancelled or test orders or handle mixed currencies. Clean the export first. Store data is processed in your local Streamlit process and must not be committed to GitHub.
 
 To generate a historical, held-out example file from the *same original training CSV*:
 
