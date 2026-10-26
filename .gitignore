@@ -237,3 +237,16 @@ __marimo__/
 !.env.example
 .streamlit/secrets.toml
 /rees46_profile.json
+
+# Extra protection before public sharing
+.venv-*/
+/artifacts/
+.vscode/
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+token.json
+service-account*.json
+!docs/
