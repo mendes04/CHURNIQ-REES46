@@ -429,6 +429,21 @@ elif page == "Store Orders (Preview)":
         "Upload ordinary transaction data to see repeat buyers, spending and customers "
         "who have not placed an order recently. No AI setup or feature engineering needed for this view.",
     )
+    section_block(
+        "A simple view of your store's orders",
+        "This page shows real past purchases. It does not guess what customers will buy next.",
+    )
+    card_grid([
+        {"icon": "📂", "label": "1. Upload your orders",
+         "description": "Choose your paid/completed orders CSV, or start with "
+                        "the sample file below.", "tone": "purple"},
+        {"icon": "🔗", "label": "2. Match your columns",
+         "description": "Tell CHURNIQ which columns hold the buyer, order number, "
+                        "date and optional amount.", "tone": "teal"},
+        {"icon": "📊", "label": "3. Explore the results",
+         "description": "See how often people ordered and who has not "
+                        "bought recently. Download the summary.", "tone": "amber"},
+    ])
     st.info(
         "**Order-history insights only.** This page does not use CHURNIQ's "
         "four-week prediction model, calculate customer churn probabilities, "
@@ -676,6 +691,21 @@ elif page == "Check Customers":
         "Upload a prepared customer-activity file and get an easy-to-read priority list. "
         "No AI knowledge is needed to interpret the results.",
     )
+    section_block(
+        "How the customer check works",
+        "The trained research model uses historical customer-activity data, not ordinary order rows.",
+    )
+    card_grid([
+        {"icon": "📄", "label": "Choose prepared customer data",
+         "description": "Upload a file with the same activity fields used "
+                        "when training the REES46 model.", "tone": "purple"},
+        {"icon": "🚩", "label": "Get clear review groups",
+         "description": "CHURNIQ shows model scores and sorts records "
+                        "into three easy-to-read priority groups.", "tone": "rose"},
+        {"icon": "🧩", "label": "Understand each result",
+         "description": "Open a customer to see which shopping signals "
+                        "affected the score and what to review.", "tone": "teal"},
+    ])
     if bundle is None:
         st.error("The prediction model has not been loaded. Check that artifacts/churniq_rees46.joblib exists.")
     else:
@@ -735,12 +765,17 @@ elif page == "Check Customers":
         result, _ = session_predictions()
         if result is not None:
             st.divider()
-            st.subheader("Customer results")
-            st.write(
-                "Start with **Needs attention**, review the reasons in "
-                "**Why Customers Are Flagged**, then use **Follow-up Planner**."
+            section_block(
+                "Your customer results",
+                "The highest model scores appear first. "
+                "These estimates are for no purchase in the next four weeks.",
             )
             show_customer_table(result, limit=20)
+            st.button(
+                "Review the full customer list →",
+                on_click=go_to, args=("Customer List",),
+                key="check_to_customer_list", type="primary",
+            )
             risk_note()
 
 
@@ -750,9 +785,26 @@ elif page == "Customer List":
         "Your customer review list",
         "Search customers, focus on an attention level, and export a list for your team.",
     )
+    section_block(
+        "Your customer workspace",
+        "Filter results to focus on the right customers. "
+        "These are review groups, not promises about future purchases.",
+    )
+    card_grid([
+        {"icon": "🔎", "label": "Find a customer",
+         "description": "Search by customer ID or show only the priority "
+                        "levels you want to review.", "tone": "purple"},
+        {"icon": "🧠", "label": "Understand their score",
+         "description": "Choose a customer and open the explanation page "
+                        "to see model signals.", "tone": "teal"},
+        {"icon": "⬇️", "label": "Share a review list",
+         "description": "Download the filtered table as a CSV for "
+                        "your team's manual review.", "tone": "amber"},
+    ])
     result, _ = predictions_or_help()
     if result is not None:
         display = display_predictions(result)
+        section_block("Find the customers you want to review")
         chosen_levels = st.multiselect(
             "Show customers marked",
             ["Needs attention", "Keep an eye on", "Lower priority"],
@@ -817,6 +869,11 @@ elif page == "Why Customers Are Flagged":
         col1.metric("Model risk score", f"{selected_row['predicted_no_purchase_risk_pct']:.1f} / 100")
         col2.metric("Review priority", display_priority(selected_row["risk_band"]))
         risk_note()
+        helpful_note(
+            "Reading this page:",
+            "The model checks historical shopping patterns and shows which ones pushed "
+            "this estimate up or down. These patterns are clues, not proven causes."
+        )
         try:
             detail = explain(bundle, raw.iloc[[selected]], max_rows=1)
             local = top_local(detail, 0).copy()
@@ -929,6 +986,21 @@ elif page == "Follow-up Planner":
         "Use these suggestions as a starting point for your retention team, "
         "not as automatic marketing instructions.",
     )
+    section_block(
+        "From model score to human action",
+        "Always check a person's real order history before making any decision.",
+    )
+    card_grid([
+        {"icon": "🔎", "label": "Check the customer",
+         "description": "Look at recent purchases, visits and any service problems. "
+                        "A model score does not explain the whole story.", "tone": "purple"},
+        {"icon": "💬", "label": "Choose a suitable next step",
+         "description": "A reminder, product update or service follow-up may be "
+                        "worth considering, if appropriate.", "tone": "amber"},
+        {"icon": "🔒", "label": "Respect the customer",
+         "description": "Follow consent and privacy rules. "
+                        "CHURNIQ does not send messages for you.", "tone": "teal"},
+    ])
     result, _ = predictions_or_help()
     if result is not None:
         high = result[result["risk_band"] == "High"]
@@ -936,24 +1008,28 @@ elif page == "Follow-up Planner":
         col1, col2 = st.columns(2)
         col1.metric("Review first", len(high))
         col2.metric("Keep an eye on", len(watch))
-        st.subheader("Suggested next steps")
-        with st.container(border=True):
-            st.markdown("#### 🔴 Needs attention")
-            st.write(suggested_review_action("High"))
-            st.caption("These records have a model score of 70 or higher out of 100.")
-        with st.container(border=True):
-            st.markdown("#### 🟡 Keep an eye on")
-            st.write(suggested_review_action("Moderate"))
-            st.caption("These records have a model score from 40 up to 70.")
-        with st.container(border=True):
-            st.markdown("#### 🟢 Lower priority")
-            st.write(suggested_review_action("Low"))
-        st.markdown(
-            "**Before customer outreach:** check whether it is appropriate, "
-            "respect marketing consent and privacy requirements, and consider "
-            "whether the customer recently purchased or contacted support."
+        section_block(
+            "Suggested checks for each review group",
+            "These ideas are for your team to consider, not automated campaigns.",
         )
-        st.subheader("Download a manual review shortlist")
+        card_grid([
+            {"icon": "🔴", "label": "Needs attention — score 70+",
+             "description": suggested_review_action("High"), "tone": "rose"},
+            {"icon": "🟠", "label": "Keep an eye on — score 40–69",
+             "description": suggested_review_action("Moderate"), "tone": "amber"},
+            {"icon": "🟢", "label": "Lower priority — under 40",
+             "description": suggested_review_action("Low"), "tone": "teal"},
+        ])
+        helpful_note(
+            "Before contacting anyone:",
+            "Check whether contact is appropriate, respect marketing consent "
+            "and privacy requirements, and look for any recent order or support issue."
+        )
+        section_block(
+            "Download a manual review shortlist",
+            "This list contains customer IDs and model scores only; "
+            "it does not send emails or promotions.",
+        )
         priority_table = display_predictions(result[result["risk_band"].isin(["High", "Moderate"])])
         priority_table = priority_table.sort_values("Risk score (not calibrated)", ascending=False)
         st.dataframe(priority_table.head(30), use_container_width=True, hide_index=True)
@@ -973,6 +1049,25 @@ elif page == "Research Lab":
         "The business pages keep things simple. This area preserves the full "
         "model comparison, experiment results and technical settings for your thesis.",
     )
+    section_block(
+        "What do these technical sections mean?",
+        "These research results help explain how CHURNIQ was evaluated. "
+        "They are separate from the everyday business workflow.",
+    )
+    card_grid([
+        {"icon": "📊", "label": "Model comparison",
+         "description": "See how different AI methods performed when checking "
+                        "historical customer outcomes.", "tone": "purple"},
+        {"icon": "🎯", "label": "Calibration study",
+         "description": "Check how closely model scores match observed outcomes "
+                        "in a separate research experiment.", "tone": "teal"},
+        {"icon": "🕒", "label": "Future-period test",
+         "description": "Test a separately trained model on a later period "
+                        "to see how it handles changing customer behaviour.", "tone": "amber"},
+        {"icon": "⚙️", "label": "Technical details",
+         "description": "Review the input fields, training setup and settings "
+                        "used by the loaded model.", "tone": "rose"},
+    ], columns=4)
     evaluation_tab, calibration_tab, temporal_tab, details_tab = st.tabs(
         ["Model comparison", "Calibration study", "Future-period test", "Technical details"]
     )
@@ -1127,6 +1222,22 @@ elif page == "Settings":
         "Review settings",
         "Control how CHURNIQ labels its predictions, or clear the current customer analysis.",
     )
+    section_block(
+        "Simple rules for reading results",
+        "These settings help your team understand scores. "
+        "They do not improve or retrain the AI model.",
+    )
+    card_grid([
+        {"icon": "🚩", "label": "Priority levels",
+         "description": "CHURNIQ groups scores into three demonstration ranges "
+                        "so your team knows where to start.", "tone": "rose"},
+        {"icon": "🎚️", "label": "Advanced threshold",
+         "description": "You can change the yes/no cut-off used on your "
+                        "next prediction run; review groups stay the same.", "tone": "purple"},
+        {"icon": "🔒", "label": "Session data",
+         "description": "Clear previously analysed customer results "
+                        "from your current session.", "tone": "teal"},
+    ])
     st.subheader("How customer priorities are assigned")
     st.write(
         "**Needs attention:** score of 70–100.  "
@@ -1153,6 +1264,12 @@ elif page == "Settings":
         st.session_state.pop("customers", None)
         st.session_state.pop("prediction_source", None)
         st.success("Customer results cleared from this session.")
+    helpful_note(
+        "About your privacy:",
+        "This research prototype processes files in your running Streamlit session. "
+        "Do not upload private customer information to public demos, "
+        "and do not commit customer files to GitHub."
+    )
 
 
 st.divider()
