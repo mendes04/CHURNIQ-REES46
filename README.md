@@ -38,6 +38,26 @@ The business navigation is:
 - **Research Lab** — scientific comparison, calibration-study report, future-period evaluation and full feature details.
 - **Settings** — explained demo risk bands, an advanced decision threshold and session cleanup.
 
+### Business-friendly UI refresh
+
+The Streamlit UI now has a polished dark purple/blue layout with rounded cards,
+readable sections, a guided sidebar and real-data summary panels. On **Business
+Home** it shows:
+
+- Four honest KPI cards (records checked, needs attention, monitor, mean model score)
+  **only after prepared customer predictions exist**.
+- A priority breakdown, top customer records, a histogram of scores and practical
+  links to explanation and follow-up pages. **No fabricated weekly change** or
+  fictitious trend/revenue values appear.
+- A **separate** order-history snapshot populated only when a normal orders CSV
+  has been analysed in Store Orders. These counts are not REES46 predictions.
+- Plain-language cards explaining each navigation page and each priority group.
+
+Other pages have a 3- or 4-card workflow guide in simple English. Settings and
+Research Lab continue to distinguish exploratory experiments and model
+limitations. The reusable UI elements live in `churniq/ui.py` and HTML-escape
+all dynamic text; they do not change the model or training pipeline.
+
 **Important business limitation:** The existing REES46 XGBoost model still requires precomputed behavioural features in its original training schema (approximately 265 available original features). Ordinary Shopify/WooCommerce order exports **can now be analysed descriptively** on the Store Orders page, but **cannot yet be used to produce XGBoost four-week risk predictions**. Real predictive support would require a matching feature-engineering pipeline or a separate appropriately trained and evaluated orders-only model, as well as permission/privacy review. CHURNIQ does not claim an automated platform integration exists.
 
 ### Store Orders example
