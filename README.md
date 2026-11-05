@@ -56,6 +56,35 @@ python -m scripts.export_holdout_cohort --data "data/raw/rees46.csv" --model "ar
 
 The **Calibration study** and **Future-period test** tabs read local JSON reports, if present, from `data/reports/rees46_calibration_full.json` and `data/reports/rees46_temporal_full.json`. They describe *separate experiments* and do not change the model serving dashboard predictions. The displayed risk scores are not yet deployed as calibrated real-world probabilities.
 
+## Chapter 4: XGBoost and SHAP figures (no retraining)
+
+To compare feature-selection scores with trained XGBoost tree-split gain and SHAP,
+use your **saved full candidate model** and a historical, group-held-out sample.
+This procedure does **not** train models or change the Streamlit dashboard.
+
+First, generate a label-free cohort from the **same unchanged original CSV in
+the same row order** as the full candidate's training input:
+
+```powershell
+python -m scripts.export_holdout_cohort --data "data/raw/rees46.csv" --model "artifacts/churniq_full_candidate.joblib" --output "data/sample/rees46_chapter4_holdout.csv" --count 200 --period 0
+```
+
+Then export the figures:
+
+```powershell
+python -m scripts.export_chapter4_explainability --model "artifacts/churniq_full_candidate.joblib" --data "data/sample/rees46_chapter4_holdout.csv" --output "data/reports/chapter4_explainability" --max-rows 200
+```
+
+The script writes, locally only:
+
+- `figure_xgboost_total_gain.png` — top 12 features by XGBoost **total gain** share
+- `figure_shap_global_importance.png` — top 12 mean absolute SHAP contributions, in **log-odds**, for these historical held-out records
+- `figure_shap_local_waterfall.png` — a local explanation of the highest-scored **sample record**, not a typical or causal customer case
+- `xgboost_shap_importance_comparison.csv` — per-feature metrics and rank comparisons
+- `explainability_metadata.json` — model and sample evidence details
+
+Use the original **SelectKBest ANOVA F-scores** as a third, separate feature-selection analysis. These three quantities use different definitions and **must not** be directly compared by their absolute magnitudes. SHAP does not establish causal drivers. The saved full candidate's risk scores are **not calibrated literal probabilities**. The generated held-out sample is retrospective, not an independent live-store validation. Keep all exported customer-level files out of GitHub.
+
 ## Install on Windows
 
 ```powershell
