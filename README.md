@@ -33,34 +33,55 @@ See [THESIS_ALIGNMENT_AUDIT.md](THESIS_ALIGNMENT_AUDIT.md) for a point-by-point 
 
 The business navigation is:
 
-- **Business Home** — simple attention-level summary for currently analysed customer records.
+- **Home** — model-flagged churn percentage, risk breakdown and top customers after analysis.
 - **Store Orders (Preview)** — upload an ordinary paid/completed orders CSV, inspect recency, sales and repeat purchasing, export an activity table, and review whether enough historical transactions exist to prepare four-week supervised learning examples. This is **descriptive and preparatory**, not a trained prediction system.
 - **Check Customers** — upload a *prepared* behaviour-feature CSV or use the local historical example.
-- **Customer List** — search, filter and export review-priority records.
-- **Why Customers Are Flagged** — readable purchasing/browsing feature names, with technical SHAP scores in an expander.
-- **Follow-up Planner** — human-review options, not automated or guaranteed retention outcomes.
+- **Customers** — search, filter and export review-priority records; optionally show actions.
+- **Explain (SHAP)** — readable model signals, a general action, and detailed SHAP in expanders.
+- **Actions** — overall retention ideas, suggested reviews per customer and CSV export.
 - **Research Lab** — scientific comparison, calibration-study report, future-period evaluation, full feature details and an explicit thesis-vs-model target-definition warning.
 - **Settings** — explained demo risk bands, an advanced decision threshold and session cleanup.
 
-### Business-friendly UI refresh
+### Supervisor feedback update: simple churn overview and retention actions
 
-The Streamlit UI now has a polished dark purple/blue layout with rounded cards,
-readable sections, a guided sidebar and real-data summary panels. On **Business
-Home** it shows:
+The default Streamlit interface is designed for nontechnical e-commerce users:
+short **Home, Predict, Customers, Explain (SHAP), Actions, Orders, Model Results,
+Settings** sidebar labels; a simple summary -> customers -> actions journey;
+and technical details hidden in optional expanders.
 
-- Four data-backed KPI cards (records checked, needs attention, monitor, mean model score)
-  **only after prepared customer predictions exist**.
-- A priority breakdown, top customer records, a histogram of scores and practical
-  links to explanation and follow-up pages. **No fabricated weekly change** or
-  fictitious trend/revenue values appear.
-- A **separate** order-history snapshot populated only when a normal orders CSV
-  has been analysed in Store Orders. These counts are not REES46 predictions.
-- Plain-language cards explaining each navigation page and each priority group.
+**Home** presents four real-data indicators after a prepared customer file has
+been analysed:
 
-Other pages have a 3- or 4-card workflow guide in simple English. Settings and
-Research Lab continue to distinguish exploratory experiments and model
-limitations. The reusable UI elements live in `churniq/ui.py` and HTML-escape
-all dynamic text; they do not change the model or training pipeline.
+- **Predicted churn (%)** = number of analysed records whose stored model
+  classification flag is 1, divided by analysed records. The flag reflects
+  the threshold used for that analysis. **This is not an observed churn rate,
+  a calibrated probability, or necessarily a percentage of unique customers.**
+- **High priority** = score >=70/100 and **Monitor** = 40 to <70/100. These
+  are demonstration review bands, **not** the prediction decision threshold.
+- **Records checked** and the average model score.
+- A short priority chart, customer shortlist, and three simple next steps.
+  No invented revenue or churn time series are shown.
+
+**Explain (SHAP)** presents the main signals for a selected record and one
+general review recommendation based on its review priority. Optional sections
+show signal-based checks and technical visualisations. SHAP is **model
+attribution, not proof of causation**, and actions have not been empirically
+validated to prevent churn.
+
+**Actions** gives four **overall** e-commerce retention suggestions (review
+orders/support, offer appropriate help, test relevant offers and track later
+outcomes) and, when predictions exist, an action suggestion for each high- or
+medium-priority record. Teams can export the manual review/action list as CSV.
+**No message, discount, email or campaign is automatically sent.**
+
+**Customers** includes an optional "Recommended next steps" table without
+crowding the default customer search view. **Orders** remains a separate
+descriptive view and never supplies predictions for the REES46 model.
+
+The original fitted model, scores, SHAP calculations, original dataset and
+thesis methodology have **not** been changed by these presentation updates.
+The dataset target-definition discrepancy is documented above and in
+[THESIS_ALIGNMENT_AUDIT.md](THESIS_ALIGNMENT_AUDIT.md).
 
 **Important business limitation:** The existing REES46 XGBoost model still requires precomputed behavioural features in its original training schema (approximately 265 available original features). Ordinary Shopify/WooCommerce order exports **can now be analysed descriptively** on the Store Orders page, but **cannot yet be used to produce XGBoost four-week risk predictions**. Real predictive support would require a matching feature-engineering pipeline or a separate appropriately trained and evaluated orders-only model, as well as permission/privacy review. CHURNIQ does not claim an automated platform integration exists.
 
