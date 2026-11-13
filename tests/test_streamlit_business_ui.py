@@ -63,4 +63,47 @@ def test_customer_list_with_predictions_and_drilldown_control():
     app.session_state["customers"] = pd.DataFrame({"session_count": [3, 5, 10]})
     app.sidebar.radio[0].set_value("Customer List").run()
     assert len(app.exception) == 0
-    assert any(button.label.startswith("Show why") for button in app.button)
+    assert any(button.label.startswith("Explain churn") for button in app.button)
+
+def test_home_displays_predicted_churn_percent_not_observed_rate():
+    app = AppTest.from_file(str(APP), default_timeout=45).run()
+    app.session_state["model_bundle"] = {
+        "report": {"model_used": "Tuned XGBoost", "source_rows": 3},
+        "features": ["session_count"],
+    }
+    app.session_state["predictions"] = pd.DataFrame({
+        "customer_id": ["A", "B", "C"],
+        "predicted_no_purchase_risk": [0.85, 0.55, 0.12],
+        "predicted_no_purchase_risk_pct": [85.0, 55.0, 12.0],
+        "predicted_no_purchase_next_4_weeks": [1, 1, 0],
+        "risk_band": ["High", "Moderate", "Low"],
+    })
+    app.session_state["customers"] = pd.DataFrame({"session_count": [3, 5, 10]})
+    app.sidebar.radio[0].set_value("Business Home").run()
+    assert len(app.exception) == 0
+    html = "\n".join(str(element.value) for element in app.markdown)
+    assert "Predicted churn" in html
+    assert "66.7%" in html
+    assert "not the actual churn rate" in html
+
+
+def test_action_planner_has_general_and_customer_recommendations():
+    app = AppTest.from_file(str(APP), default_timeout=45).run()
+    app.session_state["model_bundle"] = {
+        "report": {"model_used": "Tuned XGBoost", "source_rows": 2},
+        "features": ["session_count"],
+    }
+    app.session_state["predictions"] = pd.DataFrame({
+        "customer_id": ["A", "B"],
+        "predicted_no_purchase_risk": [0.9, 0.4],
+        "predicted_no_purchase_risk_pct": [90.0, 40.0],
+        "predicted_no_purchase_next_4_weeks": [1, 0],
+        "risk_band": ["High", "Moderate"],
+    })
+    app.session_state["customers"] = pd.DataFrame({"session_count": [3, 5]})
+    app.sidebar.radio[0].set_value("Follow-up Planner").run()
+    assert len(app.exception) == 0
+    html = "\n".join(str(element.value) for element in app.markdown)
+    assert "Overall retention plan" in html
+    assert "Recommended actions for your customers" in html
+    assert any(b.label == "Download action list (CSV)" for b in app.get("button") if b.label)
