@@ -111,12 +111,79 @@ def display_predictions(result: pd.DataFrame) -> pd.DataFrame:
 
 
 def suggested_review_action(band: str) -> str:
-    """General review suggestions; never claim a causal driver or automatic outreach."""
+    """One short, advisory action per review-priority band."""
     return {
-        "High": "Review recent orders and visits, check for unresolved service issues, and consider appropriate follow-up.",
-        "Moderate": "Monitor buying activity and review whether the customer could benefit from relevant product updates.",
-        "Low": "Continue normal customer care; monitor for meaningful changes over time.",
-    }.get(band, "Review the customer's history before deciding on an action.")
+        "High": "Check recent orders and support issues; consider a helpful follow-up.",
+        "Moderate": "Watch activity and share relevant updates where consent allows.",
+        "Low": "Continue good service and monitor for changes.",
+    }.get(str(band), "Review the customer's history first.")
+
+
+def recommended_actions_for_customers(result: pd.DataFrame) -> pd.DataFrame:
+    """Add practical review ideas without changing predictions or scores."""
+    view = display_predictions(result)
+    view["Suggested next step"] = result["risk_band"].map(suggested_review_action).values
+    return view
+
+
+def churn_overview(result: pd.DataFrame) -> dict:
+    """Summarise *model flags*, never claim to measure observed churn.
+
+    Count RECORDS, not unique customers. The classification flag follows the
+    threshold used at prediction time, while priority bands follow model-score
+    demonstration ranges and must not be confused with those flags.
+    """
+    if result.empty:
+        return {
+            "records": 0, "flagged": 0, "flagged_pct": 0.0,
+            "high": 0, "moderate": 0, "low": 0, "average_score": 0.0,
+        }
+    required = {
+        "predicted_no_purchase_next_4_weeks",
+        "predicted_no_purchase_risk", "risk_band",
+    }
+    missing = required.difference(result.columns)
+    if missing:
+        raise ValueError(f"Prediction results missing: {sorted(missing)}")
+    total = len(result)
+    flagged = int(result["predicted_no_purchase_next_4_weeks"].eq(1).sum())
+    return {
+        "records": total,
+        "flagged": flagged,
+        "flagged_pct": 100 * flagged / total,
+        "high": int(result["risk_band"].eq("High").sum()),
+        "moderate": int(result["risk_band"].eq("Moderate").sum()),
+        "low": int(result["risk_band"].eq("Low").sum()),
+        "average_score": 100 * float(result["predicted_no_purchase_risk"].mean()),
+    }
+
+
+OVERALL_RETENTION_ACTIONS = (
+    {
+        "icon": "🔍",
+        "label": "Review customers at risk",
+        "description": "Check recent orders, shopping visits and support issues before acting.",
+        "tone": "rose",
+    },
+    {
+        "icon": "💬",
+        "label": "Offer helpful support",
+        "description": "Fix service problems and consider a useful reminder when allowed.",
+        "tone": "purple",
+    },
+    {
+        "icon": "🎁",
+        "label": "Test relevant offers",
+        "description": "Try suitable updates or small offers for consenting customers. Measure the results.",
+        "tone": "amber",
+    },
+    {
+        "icon": "📈",
+        "label": "Keep learning",
+        "description": "Track future purchases and compare outcomes before claiming an action worked.",
+        "tone": "teal",
+    },
+)
 
 
 def suggested_review_checks(shap_contributions, limit: int = 3) -> list[str]:
