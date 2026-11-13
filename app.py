@@ -742,9 +742,8 @@ elif page == "Customer List":
 elif page == "Why Customers Are Flagged":
     title_block(
         "UNDERSTAND THE SIGNALS",
-        "Why did the model flag this customer for churn risk?",
-        "Use SHAP to explore which historical shopping patterns influenced the churn "
-        "risk estimate. These are model signals, not proven reasons why someone leaves.",
+        "Why was this customer flagged?",
+        "See the main signals behind the prediction and choose a next step.",
     )
     result, raw = predictions_or_help()
     if bundle is not None and result is not None:
@@ -763,11 +762,6 @@ elif page == "Why Customers Are Flagged":
         col1.metric("Churn risk score", f"{selected_row['predicted_no_purchase_risk_pct']:.1f} / 100")
         col2.metric("Review priority", display_priority(selected_row["risk_band"]))
         risk_note()
-        helpful_note(
-            "Reading this page:",
-            "The model checks historical shopping patterns and shows which ones pushed "
-            "this estimate up or down. These patterns are clues, not proven causes."
-        )
         try:
             detail = explain(bundle, raw.iloc[[selected]], max_rows=1)
             local = top_local(detail, 0).copy()
@@ -779,37 +773,30 @@ elif page == "Why Customers Are Flagged":
                 "contribution_log_odds", ascending=False
             )
             important_signals = list(dict.fromkeys(increased["Shopping signal"].tolist()))[:2]
-            st.subheader("What this means for your store")
+            section_block("Why this score?")
             if important_signals:
                 st.write(
-                    "The model flagged shopping patterns related to "
-                    + " and ".join(f"**{name.lower()}**" for name in important_signals)
-                    + " as important signals behind this risk estimate."
+                    "Important model signals: "
+                    + ", ".join(f"**{name.lower()}**" for name in important_signals)
+                    + "."
                 )
             else:
-                st.write(
-                    "No single risk-increasing shopping pattern stands out in the "
-                    "top explanation. Review the customer's history before acting."
-                )
-            st.markdown("#### What should your team check?")
-            review_prompts = suggested_review_checks(
-                list(zip(local["feature"], local["contribution_log_odds"]))
-            )
-            for prompt in review_prompts:
-                st.markdown("- " + prompt)
-            st.caption(
-                "These are suggested checks based on model signals. They do not "
-                "prove why a customer might churn or guarantee a successful follow-up."
-            )
-            st.subheader("Shopping patterns that influenced the estimate")
+                st.write("No single risk-increasing signal stands out. Check the customer's history.")
             st.dataframe(
                 most[["Shopping signal", "Effect on score"]],
-                hide_index=True,
-                use_container_width=True,
+                hide_index=True, use_container_width=True,
             )
+            section_block("Recommended action")
+            st.info(suggested_review_action(selected_row["risk_band"]))
+            with st.expander("What to check from SHAP signals"):
+                review_prompts = suggested_review_checks(
+                    list(zip(local["feature"], local["contribution_log_odds"]))
+                )
+                for prompt in review_prompts:
+                    st.markdown("- " + prompt)
             st.caption(
-                "The model may raise or lower a customer's risk score based on each "
-                "pattern. These effects are model explanations, not causes."
+                "SHAP explains the model's score, not the cause of churn. "
+                "Review real orders and customer needs before taking action."
             )
             with st.expander("Explore the detailed influence chart (advanced)"):
                 diagram = local.sort_values("contribution_log_odds").copy()
@@ -832,11 +819,6 @@ elif page == "Why Customers Are Flagged":
                 )
                 figure.update_layout(legend_title_text=None, height=500)
                 st.plotly_chart(figure, use_container_width=True)
-            st.info(
-                "Before taking action, review the customer's actual order history, "
-                "shopping activity and service interactions. A model explanation "
-                "is not evidence that a specific event caused the prediction."
-            )
             st.button(
                 "Open follow-up planner →",
                 on_click=go_to, args=("Follow-up Planner",),
@@ -875,65 +857,54 @@ elif page == "Why Customers Are Flagged":
 
 elif page == "Follow-up Planner":
     title_block(
-        "TURN INSIGHTS INTO A PLAN",
-        "Plan actions for customers at churn risk",
-        "Use these suggestions as a starting point for your retention team, "
-        "not as automatic marketing instructions.",
+        "RECOMMENDED ACTIONS",
+        "What can your store do?",
+        "Simple ideas to help keep customers coming back.",
     )
-    section_block(
-        "From model score to human action",
-        "Always check a person's real order history before making any decision.",
+    section_block("Overall retention plan")
+    card_grid(OVERALL_RETENTION_ACTIONS, columns=2)
+    st.caption(
+        "These are general business suggestions, not proven solutions. "
+        "Use customer consent and check real outcomes before claiming success."
     )
-    card_grid([
-        {"icon": "🔎", "label": "Check the customer",
-         "description": "Look at recent purchases, visits and any service problems. "
-                        "A model score does not explain the whole story.", "tone": "purple"},
-        {"icon": "💬", "label": "Choose a suitable next step",
-         "description": "A reminder, product update or service follow-up may be "
-                        "worth considering, if appropriate.", "tone": "amber"},
-        {"icon": "🔒", "label": "Respect the customer",
-         "description": "Follow consent and privacy rules. "
-                        "CHURNIQ does not send messages for you.", "tone": "teal"},
-    ])
     result, _ = predictions_or_help()
     if result is not None:
-        high = result[result["risk_band"] == "High"]
-        watch = result[result["risk_band"] == "Moderate"]
-        col1, col2 = st.columns(2)
-        col1.metric("Review first", len(high))
-        col2.metric("Keep an eye on", len(watch))
+        summary = churn_overview(result)
         section_block(
-            "Suggested checks for each review group",
-            "These ideas are for your team to consider, not automated campaigns.",
+            "Recommended actions for your customers",
+            f"{summary['high']:,} high-priority and "
+            f"{summary['moderate']:,} medium-priority records to review.",
         )
-        card_grid([
-            {"icon": "🔴", "label": "Needs attention — score 70+",
-             "description": suggested_review_action("High"), "tone": "rose"},
-            {"icon": "🟠", "label": "Keep an eye on — score 40–69",
-             "description": suggested_review_action("Moderate"), "tone": "amber"},
-            {"icon": "🟢", "label": "Lower priority — under 40",
-             "description": suggested_review_action("Low"), "tone": "teal"},
-        ])
-        helpful_note(
-            "Before contacting anyone:",
-            "Check whether contact is appropriate, respect marketing consent "
-            "and privacy requirements, and look for any recent order or support issue."
+        shortlisted = result.loc[result["risk_band"].isin(["High", "Moderate"])]
+        actions = recommended_actions_for_customers(shortlisted)
+        actions = actions.sort_values("Risk score", ascending=False)
+        if actions.empty:
+            st.info("No high- or medium-priority records in this analysis.")
+        else:
+            st.dataframe(actions.head(25), use_container_width=True, hide_index=True)
+            st.download_button(
+                "Download action list (CSV)",
+                actions.to_csv(index=False), file_name="churniq_recommended_actions.csv",
+                mime="text/csv",
+            )
+        with st.expander("What should I do for each risk level?"):
+            for group, label in (
+                ("High", "High risk"),
+                ("Moderate", "Medium risk"),
+                ("Low", "Lower risk"),
+            ):
+                st.markdown(f"**{label}:** {suggested_review_action(group)}")
+        st.caption(
+            "Actions are suggestions based on risk groups, not individually validated "
+            "treatments. SHAP shows model signals, not a proven cause or guaranteed fix. "
+            "CHURNIQ does not send messages automatically."
         )
-        section_block(
-            "Download a manual review shortlist",
-            "This list contains customer IDs and model scores only; "
-            "it does not send emails or promotions.",
-        )
-        priority_table = display_predictions(result[result["risk_band"].isin(["High", "Moderate"])])
-        priority_table = priority_table.sort_values("Risk score", ascending=False)
-        st.dataframe(priority_table.head(30), use_container_width=True, hide_index=True)
-        st.download_button(
-            "Download follow-up review list",
-            priority_table.to_csv(index=False),
-            file_name="churniq_followup_review.csv", mime="text/csv",
-        )
-        st.caption("CHURNIQ does not contact customers or send promotions automatically.")
         risk_note()
+    st.button(
+        "View customers →", on_click=go_to,
+        args=("Customer List",), key="planner_to_customers",
+    )
+
 
 
 elif page == "Research Lab":
