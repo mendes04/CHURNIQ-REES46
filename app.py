@@ -414,13 +414,13 @@ if page == "Business Home":
         "Each section answers one practical question for your online business.",
     )
     card_grid([
-        {"icon": "🔎", "label": "Check Customers",
-         "description": "Which prepared customer records should we check for "
-                        "possible non-purchase over the next four weeks?", "tone": "purple"},
+        {"icon": "🔎", "label": "Predict Churn",
+         "description":  "Which prepared customer records show "
+                        "higher churn risk based on historical shopping behaviour?", "tone": "purple"},
         {"icon": "📋", "label": "Customer List",
          "description": "Who should I look at first, and how do I export "
                         "a review list?", "tone": "amber"},
-        {"icon": "🧩", "label": "Why Customers Are Flagged",
+        {"icon": "🧩", "label": "Explain Churn (SHAP)",
          "description": "Which shopping patterns affected the model score "
                         "for one customer?", "tone": "teal"},
         {"icon": "💌", "label": "Follow-up Planner",
@@ -439,8 +439,8 @@ if page == "Business Home":
             "The boxes show how many records need attention, while the charts help you "
             "spot which scores are most common in your uploaded file.\n\n"
             "**Check Customers:** Upload a prepared REES46-style customer activity CSV. "
-            "The model reads earlier shopping patterns and estimates whether the customer "
-            "may make no purchase during the next four weeks. An ordinary order export "
+             "The model uses earlier shopping patterns to estimate a churn-class score. "
+             "The current code describes this outcome as no purchase in four weeks. An ordinary order export "
             "cannot be used here yet.\n\n"
             "**Customer List:** Search IDs, focus on a review group and export a CSV. "
             "Start with higher scores, but verify the customer's actual history first.\n\n"
@@ -466,8 +466,8 @@ if page == "Business Home":
             "It is not yet a verified real-world probability.\n\n"
             "**Review priority:** A simple group based on the score. "
             "Higher means review earlier; it does not prove a customer will leave.\n\n"
-            "**Four-week non-purchase:** The research outcome means no purchase "
-            "during the following 28 days, not permanent customer loss.\n\n"
+             "**Churn definition:** The current code describes no purchase in four weeks. "
+            "The thesis describes no interaction in the following month. These need verification.\n\n"
             "**Model explanation (SHAP):** A way to show which input patterns "
             "moved the model's estimate up or down. It does not show causation."
         )
@@ -956,7 +956,7 @@ elif page == "Why Customers Are Flagged":
                 st.markdown("- " + prompt)
             st.caption(
                 "These are suggested checks based on model signals. They do not "
-                "prove why a customer might stop buying or guarantee a successful follow-up."
+                "prove why a customer might churn or guarantee a successful follow-up."
             )
             st.subheader("Shopping patterns that influenced the estimate")
             st.dataframe(
