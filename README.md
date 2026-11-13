@@ -4,7 +4,11 @@ Research prototype for the thesis **Explainable Customer Churn Prediction in E-C
 
 ## Research target
 
-The proposal defines churn as **no purchase during the following four weeks** (label `1`), as opposed to a purchase during those four weeks (label `0`). Prediction requires historical behavioural features, never the future target.
+**Target-definition alignment must be verified.** The uploaded thesis, Chapter 3 Table 3.2, describes churn as **no interaction in the subsequent month** (label `1`). The current Python training code and saved model report describe label `1` as **no purchase in the following four weeks**. Those are not necessarily equivalent. The dashboard now uses business-facing **churn risk** labels while keeping this discrepancy explicit in Research Lab. Verify the source REES46 target labels before treating the thesis and model as scientifically identical. Prediction uses historical behavioural features, never the future target.
+
+## Thesis implementation audit
+
+See [THESIS_ALIGNMENT_AUDIT.md](THESIS_ALIGNMENT_AUDIT.md) for a point-by-point comparison of the submitted thesis and executed implementation (target definition, row count, preprocessing order, hyperparameter tuning, training UI and dataset input requirements). **The display labels have been updated; the existing trained models and metrics have not been changed.**
 
 ## Architecture
 
@@ -24,7 +28,7 @@ The proposal defines churn as **no purchase during the following four weeks** (l
 
 1. In GitHub Desktop, **Fetch origin → Pull origin**.
 2. In your activated environment, run `python -m pytest -q`.
-3. Ensure `artifacts/churniq_rees46.joblib` still contains the model you tested locally. Pulling source code does not remove your ignored model files.
+3. Prefer `artifacts/churniq_full_candidate.joblib` for the full thesis experiment. When absent, the older `artifacts/churniq_rees46.joblib` demonstration artifact is used and labelled. Pulling source code does not remove ignored local model files.
 4. Start it with `python -m streamlit run app.py` and open <http://localhost:8501>.
 
 The business navigation is:
@@ -35,7 +39,7 @@ The business navigation is:
 - **Customer List** — search, filter and export review-priority records.
 - **Why Customers Are Flagged** — readable purchasing/browsing feature names, with technical SHAP scores in an expander.
 - **Follow-up Planner** — human-review options, not automated or guaranteed retention outcomes.
-- **Research Lab** — scientific comparison, calibration-study report, future-period evaluation and full feature details.
+- **Research Lab** — scientific comparison, calibration-study report, future-period evaluation, full feature details and an explicit thesis-vs-model target-definition warning.
 - **Settings** — explained demo risk bands, an advanced decision threshold and session cleanup.
 
 ### Business-friendly UI refresh
@@ -44,7 +48,7 @@ The Streamlit UI now has a polished dark purple/blue layout with rounded cards,
 readable sections, a guided sidebar and real-data summary panels. On **Business
 Home** it shows:
 
-- Four honest KPI cards (records checked, needs attention, monitor, mean model score)
+- Four data-backed KPI cards (records checked, needs attention, monitor, mean model score)
   **only after prepared customer predictions exist**.
 - A priority breakdown, top customer records, a histogram of scores and practical
   links to explanation and follow-up pages. **No fabricated weekly change** or
