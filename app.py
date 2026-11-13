@@ -327,7 +327,7 @@ elif page == "Store Orders (Preview)":
         "Upload a paid-order CSV to explore past purchases. "
         "This page does not predict churn; use Predict for AI results."
     )
-    example_csv = (    example_csv = (
+    example_csv = (
         "customer_id,order_id,order_date,order_total\n"
         "C001,O100,2026-09-04,120.50\n"
         "C001,O101,2026-10-09,74.00\n"
@@ -572,7 +572,7 @@ elif page == "Check Customers":
         "Upload a prepared REES46-style activity CSV, or try the example. "
         "Ordinary store order exports are not ready for this model."
     )
-    if bundle is None:    if bundle is None:
+    if bundle is None:
         st.error("The prediction model has not been loaded. Check that artifacts/churniq_rees46.joblib exists.")
     else:
         upload_tab, sample_tab = st.tabs(["Upload your prepared file", "Try an example"])
@@ -646,7 +646,7 @@ elif page == "Customer List":
         "Your customers",
         "Search, review and export churn risk results.",
     )
-    result, _ = predictions_or_help()    result, _ = predictions_or_help()
+    result, _ = predictions_or_help()
     if result is not None:
         display = display_predictions(result)
         section_block("Find the customers you want to review")
@@ -877,7 +877,7 @@ elif page == "Research Lab":
     st.info("Thesis focus: " + PROJECT_TITLE)
     st.warning(TARGET_RECONCILIATION_NOTE)
     st.caption("Technical evidence for your thesis. Choose a tab below.")
-    evaluation_tab, calibration_tab, temporal_tab, details_tab = st.tabs(    evaluation_tab, calibration_tab, temporal_tab, details_tab = st.tabs(
+    evaluation_tab, calibration_tab, temporal_tab, details_tab = st.tabs(
         ["Model comparison", "Calibration study", "Future-period test", "Technical details"]
     )
     with evaluation_tab:
@@ -1035,7 +1035,7 @@ elif page == "Settings":
         "Review settings",
         "Control how CHURNIQ labels its predictions, or clear the current customer analysis.",
     )
-    st.subheader("How customer priorities are assigned")    st.subheader("How customer priorities are assigned")
+    st.subheader("How customer priorities are assigned")
     st.write(
         "**Needs attention:** score of 70–100.  "
         "**Keep an eye on:** score of 40–69.9.  "
