@@ -18,9 +18,10 @@ def test_business_customer_table_preserves_risk_without_using_jargon():
     readable = display_predictions(predictions)
     assert readable.iloc[0]["Customer ID"] == "1001"
     assert readable.iloc[0]["Priority"] == "Needs attention"
-    assert readable.iloc[0]["Risk score (not calibrated)"] == pytest.approx(85.0)
+    assert readable.iloc[0]["Churn risk score (not calibrated)"] == pytest.approx(85.0)
+    assert readable.iloc[0]["Predicted churn status (proxy)"] == "Churn risk flagged"
     assert readable.iloc[1]["Priority"] == "Lower priority"
-    assert readable.iloc[1]["Model's 4-week prediction"] == "Purchase expected"
+    assert readable.iloc[1]["Predicted churn status (proxy)"] == "Not flagged for churn"
     assert predictions.iloc[0]["predicted_no_purchase_risk"] == 0.85
 
 
