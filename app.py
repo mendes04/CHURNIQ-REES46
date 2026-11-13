@@ -26,15 +26,25 @@ from churniq.model import load, predict
 from churniq.store_orders import suggest_order_columns, summarize_orders
 from churniq.order_readiness import canonical_orders, assess_prediction_readiness
 from churniq.ui import CSS, hero, section, cards, guide
+from churniq.thesis_alignment import (
+    PROJECT_TITLE, CHURN_PROXY_NOTE, TARGET_RECONCILIATION_NOTE,
+    THESIS_CHURN_DEFINITION, MODEL_CHURN_DEFINITION, model_artifact_label,
+)
 
 
 ROOT = Path(__file__).parent
-MODEL_PATH = ROOT / "artifacts" / "churniq_rees46.joblib"
-SAMPLE_PATH = ROOT / "data" / "sample" / "rees46_heldout_cohort.csv"
+FULL_MODEL_PATH = ROOT / "artifacts" / "churniq_full_candidate.joblib"
+DEMO_MODEL_PATH = ROOT / "artifacts" / "churniq_rees46.joblib"
+MODEL_PATH = FULL_MODEL_PATH if FULL_MODEL_PATH.exists() else DEMO_MODEL_PATH
+SAMPLE_PATH = (
+    ROOT / "data" / "sample" / "rees46_chapter4_holdout.csv"
+    if MODEL_PATH == FULL_MODEL_PATH else
+    ROOT / "data" / "sample" / "rees46_heldout_cohort.csv"
+)
 CALIBRATION_PATH = ROOT / "data" / "reports" / "rees46_calibration_full.json"
 TEMPORAL_PATH = ROOT / "data" / "reports" / "rees46_temporal_full.json"
 
-st.set_page_config(page_title="CHURNIQ | Customer Retention Workspace", page_icon="🛍️", layout="wide")
+st.set_page_config(page_title="CHURNIQ | Explainable Customer Churn Prediction", page_icon="🛍️", layout="wide")
 st.markdown(CSS, unsafe_allow_html=True)
 
 
@@ -64,8 +74,7 @@ def predictions_or_help():
 
 def risk_note():
     st.caption(
-        "Risk scores show the current model's estimates for no purchase in the next four weeks. "
-        "They are not yet calibrated as exact real-world probabilities and do not prove a customer will leave."
+        CHURN_PROXY_NOTE
     )
 
 
@@ -87,7 +96,7 @@ def helpful_note(title, description):
 
 def show_customer_table(result, limit=None):
     view = display_predictions(result)
-    view = view.sort_values("Risk score (not calibrated)", ascending=False)
+    view = view.sort_values("Churn risk score (not calibrated)", ascending=False)
     st.dataframe(view.head(limit) if limit else view, use_container_width=True, hide_index=True)
     return view
 
@@ -127,7 +136,7 @@ def run_customer_predictions(data, source_label, identifier=None):
 bundle = model_bundle()
 st.sidebar.markdown(
     '<div class="cq-brand"><div class="cq-brand-title">✧ CHURN<span>IQ</span></div>'
-    '<div class="cq-brand-caption">CUSTOMER RETENTION WORKSPACE</div></div>',
+    '<div class="cq-brand-caption">EXPLAINABLE CUSTOMER CHURN PREDICTION</div></div>',
     unsafe_allow_html=True,
 )
 page = st.sidebar.radio(
@@ -144,18 +153,21 @@ page = st.sidebar.radio(
     ],
     key="navigation_page",
     format_func=lambda name: {
-        "Business Home": "⌂  Business Home",
-        "Check Customers": "◎  Check Customers",
-        "Customer List": "☷  Customer List",
-        "Why Customers Are Flagged": "◇  Why Customers Are Flagged",
-        "Follow-up Planner": "✦  Follow-up Planner",
+        "Business Home": "⌂  Churn Overview",
+        "Check Customers": "◎  Predict Churn",
+        "Customer List": "☷  Churn Risk List",
+        "Why Customers Are Flagged": "◇  Explain Churn (SHAP)",
+        "Follow-up Planner": "✦  Retention Planner",
         "Store Orders (Preview)": "▣  Store Orders",
-        "Research Lab": "◈  Research Lab",
+        "Research Lab": "◈  Model Evaluation",
         "Settings": "⚙  Settings",
     }.get(name, name),
 )
 if bundle is not None:
-    st.sidebar.success("REES46 prediction model loaded")
+    if MODEL_PATH == FULL_MODEL_PATH:
+        st.sidebar.success("Full tuned XGBoost model loaded")
+    else:
+        st.sidebar.warning("Earlier demo model loaded; full candidate not found")
 else:
     st.sidebar.warning("REES46 prediction model not loaded")
 st.sidebar.markdown(
@@ -177,17 +189,19 @@ with st.sidebar.expander("What do the pages do?"):
         "**Settings:** preferences and session data."
     )
 st.sidebar.caption("Research prototype · No automatic customer messages")
+st.sidebar.caption("Model source: " + MODEL_PATH.name)
 
 
 if page == "Business Home":
     title_block(
         "YOUR RETENTION OVERVIEW",
-        "Know who might stop buying",
-        "See who may need attention, understand the model's signals, "
-        "and decide what to review next. Everything starts with your own data.",
+        "Understand and predict customer churn",
+        "Identify customers at risk of churn, understand their shopping patterns "
+        "with SHAP, and support better retention decisions."
     )
     result, _ = session_predictions()
     if result is None:
+        helpful_note("About churn in this research:", CHURN_PROXY_NOTE)
         section_block(
             "Start with three simple steps",
             "You do not need to understand AI to use the business pages.",
@@ -206,7 +220,7 @@ if page == "Business Home":
         left, right = st.columns(2, gap="medium")
         with left:
             st.button(
-                "Check customer risk →",
+                "Predict customer churn →",
                 type="primary", use_container_width=True,
                 on_click=go_to, args=("Check Customers",), key="home_start_predictions",
             )
@@ -238,18 +252,18 @@ if page == "Business Home":
             f"· {total:,} records · {unique_customers:,} unique customer IDs"
         )
         section_block(
-            "Your customer snapshot",
+            "Churn risk overview",
             "These numbers describe only the records analysed in this session, "
             "not every customer in your online store.",
         )
         card_grid([
             {"icon": "👥", "label": "Records checked", "value": f"{total:,}",
              "description": "Customer records in this analysis.", "tone": "purple"},
-            {"icon": "🚩", "label": "Needs attention", "value": f"{high:,}",
+            {"icon": "🚩", "label": "High churn risk", "value": f"{high:,}",
              "description": "Model score of 70 or more out of 100.", "tone": "rose"},
-            {"icon": "👀", "label": "Keep an eye on", "value": f"{watch:,}",
+            {"icon": "👀", "label": "Moderate churn risk", "value": f"{watch:,}",
              "description": "Model score from 40 to under 70.", "tone": "amber"},
-            {"icon": "📊", "label": "Average model score", "value": f"{average_score:.1f} / 100",
+            {"icon": "📊", "label": "Average churn risk score", "value": f"{average_score:.1f} / 100",
              "description": "Not an exact real-world chance of leaving.", "tone": "teal"},
         ], columns=4, metric=True)
         if high:
@@ -265,7 +279,7 @@ if page == "Business Home":
                 "Keep monitoring activity and continue normal customer care."
             )
         section_block(
-            "Who should your team review first?",
+            "Which customers have the highest churn risk?",
             "Review-priority groups are simple demonstration ranges based on model scores.",
         )
         left, right = st.columns([1, 1.35], gap="large")
@@ -324,13 +338,13 @@ if page == "Business Home":
         lower_left, lower_right = st.columns([1.15, 1], gap="large")
         with lower_left:
             with st.container(border=True):
-                st.markdown("#### Model score spread")
+                st.markdown("#### Churn risk score distribution")
                 st.caption("How many records have low, medium or high model scores?")
                 score_values = pd.DataFrame({
-                    "Model score": result["predicted_no_purchase_risk"].astype(float) * 100
+                    "Churn risk score": result["predicted_no_purchase_risk"].astype(float) * 100
                 })
                 fig_dist = px.histogram(
-                    score_values, x="Model score", nbins=20, template="plotly_dark",
+                    score_values, x="Churn risk score", nbins=20, template="plotly_dark",
                     color_discrete_sequence=["#a184f9"],
                 )
                 fig_dist.update_layout(
@@ -724,12 +738,12 @@ elif page == "Store Orders (Preview)":
 elif page == "Check Customers":
     title_block(
         "START HERE",
-        "Find customers who may not buy again",
+        "Predict customer churn risk",
         "Upload a prepared customer-activity file and get an easy-to-read priority list. "
         "No AI knowledge is needed to interpret the results.",
     )
     section_block(
-        "How the customer check works",
+        "How churn prediction works",
         "The trained research model uses historical customer-activity data, not ordinary order rows.",
     )
     card_grid([
@@ -805,7 +819,7 @@ elif page == "Check Customers":
             section_block(
                 "Your customer results",
                 "The highest model scores appear first. "
-                "These estimates are for no purchase in the next four weeks.",
+                "These are churn risk estimates from the existing four-week no-purchase model.",
             )
             show_customer_table(result, limit=20)
             st.button(
@@ -819,7 +833,7 @@ elif page == "Check Customers":
 elif page == "Customer List":
     title_block(
         "CUSTOMER PRIORITIES",
-        "Your customer review list",
+        "Your churn risk customer list",
         "Search customers, focus on an attention level, and export a list for your team.",
     )
     section_block(
@@ -851,7 +865,7 @@ elif page == "Customer List":
         chosen = display[display["Priority"].isin(chosen_levels)]
         if keyword:
             chosen = chosen[chosen["Customer ID"].str.contains(keyword, case=False, regex=False)]
-        chosen = chosen.sort_values("Risk score (not calibrated)", ascending=False)
+        chosen = chosen.sort_values("Churn risk score (not calibrated)", ascending=False)
         st.caption(f"{len(chosen):,} matching customer records")
         st.dataframe(chosen, use_container_width=True, hide_index=True)
         if not chosen.empty:
@@ -885,9 +899,9 @@ elif page == "Customer List":
 elif page == "Why Customers Are Flagged":
     title_block(
         "UNDERSTAND THE SIGNALS",
-        "What influenced this customer's risk?",
-        "Understand which shopping and purchasing patterns influenced the model's score. "
-        "These are clues to investigate, not proven reasons someone stopped buying.",
+        "Why did the model flag this customer for churn risk?",
+        "Use SHAP to explore which historical shopping patterns influenced the churn "
+        "risk estimate. These are model signals, not proven reasons why someone leaves.",
     )
     result, raw = predictions_or_help()
     if bundle is not None and result is not None:
@@ -903,7 +917,7 @@ elif page == "Why Customers Are Flagged":
         st.session_state["focused_customer_idx"] = int(selected)
         selected_row = result.iloc[selected]
         col1, col2 = st.columns(2)
-        col1.metric("Model risk score", f"{selected_row['predicted_no_purchase_risk_pct']:.1f} / 100")
+        col1.metric("Churn risk score", f"{selected_row['predicted_no_purchase_risk_pct']:.1f} / 100")
         col2.metric("Review priority", display_priority(selected_row["risk_band"]))
         risk_note()
         helpful_note(
@@ -1019,7 +1033,7 @@ elif page == "Why Customers Are Flagged":
 elif page == "Follow-up Planner":
     title_block(
         "TURN INSIGHTS INTO A PLAN",
-        "Decide who needs a closer look",
+        "Plan actions for customers at churn risk",
         "Use these suggestions as a starting point for your retention team, "
         "not as automatic marketing instructions.",
     )
@@ -1068,7 +1082,7 @@ elif page == "Follow-up Planner":
             "it does not send emails or promotions.",
         )
         priority_table = display_predictions(result[result["risk_band"].isin(["High", "Moderate"])])
-        priority_table = priority_table.sort_values("Risk score (not calibrated)", ascending=False)
+        priority_table = priority_table.sort_values("Churn risk score (not calibrated)", ascending=False)
         st.dataframe(priority_table.head(30), use_container_width=True, hide_index=True)
         st.download_button(
             "Download follow-up review list",
@@ -1082,10 +1096,12 @@ elif page == "Follow-up Planner":
 elif page == "Research Lab":
     title_block(
         "FOR RESEARCHERS AND SUPERVISORS",
-        "Model evidence and technical details",
+        "XGBoost results and SHAP research evidence",
         "The business pages keep things simple. This area preserves the full "
         "model comparison, experiment results and technical settings for your thesis.",
     )
+    st.info("Thesis focus: " + PROJECT_TITLE)
+    st.warning(TARGET_RECONCILIATION_NOTE)
     section_block(
         "What do these technical sections mean?",
         "These research results help explain how CHURNIQ was evaluated. "
@@ -1235,7 +1251,11 @@ elif page == "Research Lab":
         if bundle is not None:
             report = bundle["report"]
             st.write("**Loaded model:**", report.get("model_used", "Unspecified"))
-            st.write("**Target:** No purchase during the following four weeks (label 1).")
+            st.write("**Model file:**", MODEL_PATH.name)
+            st.write("**Model experiment:**", model_artifact_label(str(MODEL_PATH)))
+            st.write("**Thesis churn definition:**", THESIS_CHURN_DEFINITION)
+            st.write("**Current code target definition:**", report.get("project_target_definition", MODEL_CHURN_DEFINITION))
+            st.write("**Outcome used by saved model:**", report.get("project_target_definition", MODEL_CHURN_DEFINITION))
             st.write("**Training records:**", f"{report.get('source_rows', 0):,}")
             st.write("**Data split:**", report.get("split", "Not reported"))
             st.json({
@@ -1284,7 +1304,7 @@ elif page == "Settings":
     st.caption("These are demonstration grouping rules, not calibrated probabilities or proven campaign thresholds.")
     with st.expander("Advanced: model classification threshold"):
         value = st.slider(
-            "Threshold for the model's yes/no four-week prediction",
+            "Threshold for the model's yes/no churn-risk flag",
             0.05, 0.95, float(st.session_state.get("decision_threshold", 0.5)), 0.05,
         )
         st.session_state.decision_threshold = value
