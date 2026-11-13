@@ -323,27 +323,11 @@ elif page == "Store Orders (Preview)":
         "Upload ordinary transaction data to see repeat buyers, spending and customers "
         "who have not placed an order recently. No AI setup or feature engineering needed for this view.",
     )
-    section_block(
-        "A simple view of your store's orders",
-        "This page shows real past purchases. It does not guess what customers will buy next.",
+    st.caption(
+        "Upload a paid-order CSV to explore past purchases. "
+        "This page does not predict churn; use Predict for AI results."
     )
-    card_grid([
-        {"icon": "📂", "label": "1. Upload your orders",
-         "description": "Choose your paid/completed orders CSV, or start with "
-                        "the sample file below.", "tone": "purple"},
-        {"icon": "🔗", "label": "2. Match your columns",
-         "description": "Tell CHURNIQ which columns hold the buyer, order number, "
-                        "date and optional amount.", "tone": "teal"},
-        {"icon": "📊", "label": "3. Explore the results",
-         "description": "See how often people ordered and who has not "
-                        "bought recently. Download the summary.", "tone": "amber"},
-    ])
-    st.info(
-        "**Order-history insights only.** This page does not use CHURNIQ's "
-        "four-week prediction model, calculate customer churn probabilities, "
-        "or predict whether someone will purchase again."
-    )
-    example_csv = (
+    example_csv = (    example_csv = (
         "customer_id,order_id,order_date,order_total\n"
         "C001,O100,2026-09-04,120.50\n"
         "C001,O101,2026-10-09,74.00\n"
@@ -581,33 +565,16 @@ elif page == "Store Orders (Preview)":
 elif page == "Check Customers":
     title_block(
         "START HERE",
-        "Predict customer churn risk",
-        "Upload a prepared customer-activity file and get an easy-to-read priority list. "
-        "No AI knowledge is needed to interpret the results.",
+        "Predict churn",
+        "Upload customer data and see who may need attention.",
     )
-    section_block(
-        "How churn prediction works",
-        "The trained research model uses historical customer-activity data, not ordinary order rows.",
+    st.caption(
+        "Upload a prepared REES46-style activity CSV, or try the example. "
+        "Ordinary store order exports are not ready for this model."
     )
-    card_grid([
-        {"icon": "📄", "label": "Choose prepared customer data",
-         "description": "Upload a file with the same activity fields used "
-                        "when training the REES46 model.", "tone": "purple"},
-        {"icon": "🚩", "label": "Get clear review groups",
-         "description": "CHURNIQ shows model scores and sorts records "
-                        "into three easy-to-read priority groups.", "tone": "rose"},
-        {"icon": "🧩", "label": "Understand each result",
-         "description": "Open a customer to see which shopping signals "
-                        "affected the score and what to review.", "tone": "teal"},
-    ])
-    if bundle is None:
+    if bundle is None:    if bundle is None:
         st.error("The prediction model has not been loaded. Check that artifacts/churniq_rees46.joblib exists.")
     else:
-        st.info(
-            "What you need: **a prepared customer-activity CSV**, not just a list of orders. "
-            "This research model uses historical shopping behaviour that must be calculated "
-            "from your store's events and transactions first."
-        )
         upload_tab, sample_tab = st.tabs(["Upload your prepared file", "Try an example"])
         with upload_tab:
             uploaded = st.file_uploader("Choose customer-activity CSV", type="csv")
@@ -676,26 +643,10 @@ elif page == "Check Customers":
 elif page == "Customer List":
     title_block(
         "CUSTOMER PRIORITIES",
-        "Your churn risk customer list",
-        "Search customers, focus on an attention level, and export a list for your team.",
+        "Your customers",
+        "Search, review and export churn risk results.",
     )
-    section_block(
-        "Your customer workspace",
-        "Filter results to focus on the right customers. "
-        "These are review groups, not promises about future purchases.",
-    )
-    card_grid([
-        {"icon": "🔎", "label": "Find a customer",
-         "description": "Search by customer ID or show only the priority "
-                        "levels you want to review.", "tone": "purple"},
-        {"icon": "🧠", "label": "Understand their score",
-         "description": "Choose a customer and open the explanation page "
-                        "to see model signals.", "tone": "teal"},
-        {"icon": "⬇️", "label": "Share a review list",
-         "description": "Download the filtered table as a CSV for "
-                        "your team's manual review.", "tone": "amber"},
-    ])
-    result, _ = predictions_or_help()
+    result, _ = predictions_or_help()    result, _ = predictions_or_help()
     if result is not None:
         display = display_predictions(result)
         section_block("Find the customers you want to review")
@@ -711,8 +662,18 @@ elif page == "Customer List":
         chosen = chosen.sort_values("Risk score", ascending=False)
         st.caption(f"{len(chosen):,} matching customer records")
         st.dataframe(chosen, use_container_width=True, hide_index=True)
+        with st.expander("Recommended next steps"):
+            if chosen.empty:
+                st.write("No customers match the current filters.")
+            else:
+                selected_rows = result.loc[chosen.index]
+                st.dataframe(
+                    recommended_actions_for_customers(selected_rows),
+                    use_container_width=True, hide_index=True,
+                )
+                st.caption("General suggestions. Review real customer history first.")
         if not chosen.empty:
-            st.subheader("Understand one customer")
+            st.subheader("Explain one customer")
             chosen_idx = st.selectbox(
                 "Choose a record to explain",
                 options=chosen.index.tolist(),
@@ -724,7 +685,7 @@ elif page == "Customer List":
                 key="list_explain_customer",
             )
             st.button(
-                "Show why this customer was flagged →",
+                "Explain churn (SHAP) →",
                 on_click=go_to,
                 args=("Why Customers Are Flagged", int(chosen_idx)),
                 type="primary",
@@ -910,32 +871,13 @@ elif page == "Follow-up Planner":
 elif page == "Research Lab":
     title_block(
         "FOR RESEARCHERS AND SUPERVISORS",
-        "XGBoost results and SHAP research evidence",
-        "The business pages keep things simple. This area preserves the full "
-        "model comparison, experiment results and technical settings for your thesis.",
+        "Model results",
+        "View model comparisons, SHAP and the training setup.",
     )
     st.info("Thesis focus: " + PROJECT_TITLE)
     st.warning(TARGET_RECONCILIATION_NOTE)
-    section_block(
-        "What do these technical sections mean?",
-        "These research results help explain how CHURNIQ was evaluated. "
-        "They are separate from the everyday business workflow.",
-    )
-    card_grid([
-        {"icon": "📊", "label": "Model comparison",
-         "description": "See how different AI methods performed when checking "
-                        "historical customer outcomes.", "tone": "purple"},
-        {"icon": "🎯", "label": "Calibration study",
-         "description": "Check how closely model scores match observed outcomes "
-                        "in a separate research experiment.", "tone": "teal"},
-        {"icon": "🕒", "label": "Future-period test",
-         "description": "Test a separately trained model on a later period "
-                        "to see how it handles changing customer behaviour.", "tone": "amber"},
-        {"icon": "⚙️", "label": "Technical details",
-         "description": "Review the input fields, training setup and settings "
-                        "used by the loaded model.", "tone": "rose"},
-    ], columns=4)
-    evaluation_tab, calibration_tab, temporal_tab, details_tab = st.tabs(
+    st.caption("Technical evidence for your thesis. Choose a tab below.")
+    evaluation_tab, calibration_tab, temporal_tab, details_tab = st.tabs(    evaluation_tab, calibration_tab, temporal_tab, details_tab = st.tabs(
         ["Model comparison", "Calibration study", "Future-period test", "Technical details"]
     )
     with evaluation_tab:
@@ -1093,23 +1035,7 @@ elif page == "Settings":
         "Review settings",
         "Control how CHURNIQ labels its predictions, or clear the current customer analysis.",
     )
-    section_block(
-        "Simple rules for reading results",
-        "These settings help your team understand scores. "
-        "They do not improve or retrain the AI model.",
-    )
-    card_grid([
-        {"icon": "🚩", "label": "Priority levels",
-         "description": "CHURNIQ groups scores into three demonstration ranges "
-                        "so your team knows where to start.", "tone": "rose"},
-        {"icon": "🎚️", "label": "Advanced threshold",
-         "description": "You can change the yes/no cut-off used on your "
-                        "next prediction run; review groups stay the same.", "tone": "purple"},
-        {"icon": "🔒", "label": "Session data",
-         "description": "Clear previously analysed customer results "
-                        "from your current session.", "tone": "teal"},
-    ])
-    st.subheader("How customer priorities are assigned")
+    st.subheader("How customer priorities are assigned")    st.subheader("How customer priorities are assigned")
     st.write(
         "**Needs attention:** score of 70–100.  "
         "**Keep an eye on:** score of 40–69.9.  "
