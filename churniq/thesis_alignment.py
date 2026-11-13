@@ -22,10 +22,12 @@ MODEL_CHURN_DEFINITION = (
 )
 
 CHURN_PROXY_NOTE = (
-    "Churn risk is the dashboard name for the existing model's four-week "
-    "non-purchase estimate. It is a proxy for customer churn, not proof that "
-    "someone has permanently left. Scores have not been calibrated as exact "
-    "real-world probabilities."
+    "CHURNIQ presents the saved model's output as a churn risk score. "
+    "The existing training code describes the outcome as no purchase in four weeks, "
+    "while the thesis describes no interaction during the following month. "
+    "The exact REES46 target definition requires verification. "
+    "The score is neither proof of permanent customer loss nor a calibrated "
+    "real-world probability."
 )
 
 TARGET_RECONCILIATION_NOTE = (
