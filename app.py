@@ -15,6 +15,9 @@ import streamlit as st
 from churniq.business import (
     display_predictions,
     display_priority,
+    churn_overview,
+    recommended_actions_for_customers,
+    OVERALL_RETENTION_ACTIONS,
     readable_effect,
     readable_feature,
     suggested_review_action,
@@ -96,7 +99,7 @@ def helpful_note(title, description):
 
 def show_customer_table(result, limit=None):
     view = display_predictions(result)
-    view = view.sort_values("Churn risk score (not calibrated)", ascending=False)
+    view = view.sort_values("Risk score", ascending=False)
     st.dataframe(view.head(limit) if limit else view, use_container_width=True, hide_index=True)
     return view
 
@@ -140,7 +143,7 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 page = st.sidebar.radio(
-    "Explore CHURNIQ",
+    "Menu",
     [
         "Business Home",
         "Check Customers",
@@ -153,13 +156,13 @@ page = st.sidebar.radio(
     ],
     key="navigation_page",
     format_func=lambda name: {
-        "Business Home": "⌂  Churn Overview",
-        "Check Customers": "◎  Predict Churn",
-        "Customer List": "☷  Churn Risk List",
-        "Why Customers Are Flagged": "◇  Explain Churn (SHAP)",
-        "Follow-up Planner": "✦  Retention Planner",
-        "Store Orders (Preview)": "▣  Store Orders",
-        "Research Lab": "◈  Model Evaluation",
+        "Business Home": "⌂  Home",
+        "Check Customers": "◎  Predict",
+        "Customer List": "☷  Customers",
+        "Why Customers Are Flagged": "◇  Explain (SHAP)",
+        "Follow-up Planner": "✦  Actions",
+        "Store Orders (Preview)": "▣  Orders",
+        "Research Lab": "◈  Model Results",
         "Settings": "⚙  Settings",
     }.get(name, name),
 )
@@ -170,23 +173,14 @@ if bundle is not None:
         st.sidebar.warning("Earlier demo model loaded; full candidate not found")
 else:
     st.sidebar.warning("REES46 prediction model not loaded")
-st.sidebar.markdown(
-    '<div class="cq-side-note"><strong>New here?</strong>'
-    '<p>1. Check customers using a prepared activity file.<br>'
-    '2. Read the results and review customers.<br>'
-    '3. Use Store Orders for normal shop order files.</p></div>',
-    unsafe_allow_html=True,
-)
-with st.sidebar.expander("What do the pages do?"):
+with st.sidebar.expander("Help"):
     st.markdown(
-        "**Home:** summary and next steps.  \n"
-        "**Check Customers:** run the trained research model.  \n"
-        "**Customer List:** search and download results.  \n"
-        "**Why Flagged:** understand the model's signals.  \n"
-        "**Follow-up:** decide what to review next.  \n"
-        "**Store Orders:** explore ordinary order exports without AI predictions.  \n"
-        "**Research Lab:** technical results for the thesis.  \n"
-        "**Settings:** preferences and session data."
+        "**Predict:** upload prepared REES46 customer data.  \n"
+        "**Customers:** search churn risk results.  \n"
+        "**Explain:** see SHAP signals.  \n"
+        "**Actions:** plan customer follow-ups.  \n"
+        "**Orders:** view past orders only.  \n"
+        "**Model Results:** research metrics."
     )
 st.sidebar.caption("Research prototype · No automatic customer messages")
 st.sidebar.caption("Model source: " + MODEL_PATH.name)
@@ -194,283 +188,132 @@ st.sidebar.caption("Model source: " + MODEL_PATH.name)
 
 if page == "Business Home":
     title_block(
-        "YOUR RETENTION OVERVIEW",
-        "Understand and predict customer churn",
-        "Identify customers at risk of churn, understand their shopping patterns "
-        "with SHAP, and support better retention decisions."
+        "CHURN OVERVIEW",
+        "Spot churn risk. Take action.",
+        "See how many customers may need attention and choose your next step.",
     )
     result, _ = session_predictions()
     if result is None:
-        helpful_note("About churn in this research:", CHURN_PROXY_NOTE)
-        section_block(
-            "Start with three simple steps",
-            "You do not need to understand AI to use the business pages.",
-        )
+        section_block("Get started", "Choose your data to see churn estimates.")
         card_grid([
-            {"icon": "📂", "label": "1. Choose your data",
-             "description": "Use a prepared customer activity file for AI risk checks. "
-                            "Have a normal orders CSV? Open Store Orders instead.", "tone": "purple"},
-            {"icon": "🔎", "label": "2. Check the results",
-             "description": "See which records are in the highest review-priority group "
-                            "and which may need monitoring.", "tone": "teal"},
-            {"icon": "💜", "label": "3. Decide what to do",
-             "description": "Read the model's signals, check actual customer history "
-                            "and download a list for your team.", "tone": "amber"},
+            {"icon": "📂", "label": "1. Upload data",
+             "description": "Use a prepared REES46 customer activity file.", "tone": "purple"},
+            {"icon": "🎯", "label": "2. Check churn risk",
+             "description": "View model scores and customers to review.", "tone": "amber"},
+            {"icon": "💬", "label": "3. Take action",
+             "description": "Review SHAP clues and plan a suitable follow-up.", "tone": "teal"},
         ])
         left, right = st.columns(2, gap="medium")
         with left:
             st.button(
-                "Predict customer churn →",
-                type="primary", use_container_width=True,
-                on_click=go_to, args=("Check Customers",), key="home_start_predictions",
+                "Predict churn →", type="primary",
+                use_container_width=True, on_click=go_to,
+                args=("Check Customers",), key="home_start_predictions",
             )
         with right:
             st.button(
-                "Explore store orders →",
-                use_container_width=True,
-                on_click=go_to, args=("Store Orders (Preview)",), key="home_start_orders",
+                "Explore orders →", use_container_width=True,
+                on_click=go_to,
+                args=("Store Orders (Preview)",), key="home_start_orders",
             )
         if bundle is None:
-            st.warning(
-                "The REES46 prediction model is not loaded yet. "
-                "You can still explore normal order-history data."
-            )
+            st.warning("Load your saved CHURNIQ model to predict churn.")
         else:
-            st.info(
-                "For a guided example, open Check Customers → Try an example. "
-                "It uses historical REES46 records if your local sample file is available."
-            )
+            st.caption("Tip: Try the historical REES46 sample on Predict Churn.")
     else:
-        total = len(result)
-        unique_customers = result["customer_id"].nunique()
-        high = int((result["risk_band"] == "High").sum())
-        watch = int((result["risk_band"] == "Moderate").sum())
-        low = int((result["risk_band"] == "Low").sum())
-        average_score = float(result["predicted_no_purchase_risk"].mean()) * 100
+        summary = churn_overview(result)
+        total = summary["records"]
         st.caption(
-            f"Showing: {st.session_state.get('prediction_source', 'Current analysis')} "
-            f"· {total:,} records · {unique_customers:,} unique customer IDs"
+            f"{st.session_state.get('prediction_source', 'Current analysis')} · "
+            f"{total:,} records · {result['customer_id'].nunique():,} customer IDs"
         )
-        section_block(
-            "Churn risk overview",
-            "These numbers describe only the records analysed in this session, "
-            "not every customer in your online store.",
-        )
+        section_block("Churn snapshot")
         card_grid([
+            {"icon": "📉", "label": "Predicted churn", "value": f"{summary['flagged_pct']:.1f}%",
+             "description": f"{summary['flagged']:,} of {total:,} records flagged.", "tone": "rose"},
+            {"icon": "🚩", "label": "High priority", "value": f"{summary['high']:,}",
+             "description": "Risk score 70 or above.", "tone": "amber"},
+            {"icon": "👀", "label": "Monitor", "value": f"{summary['moderate']:,}",
+             "description": "Risk score 40–69.9.", "tone": "purple"},
             {"icon": "👥", "label": "Records checked", "value": f"{total:,}",
-             "description": "Customer records in this analysis.", "tone": "purple"},
-            {"icon": "🚩", "label": "High churn risk", "value": f"{high:,}",
-             "description": "Model score of 70 or more out of 100.", "tone": "rose"},
-            {"icon": "👀", "label": "Moderate churn risk", "value": f"{watch:,}",
-             "description": "Model score from 40 to under 70.", "tone": "amber"},
-            {"icon": "📊", "label": "Average churn risk score", "value": f"{average_score:.1f} / 100",
-             "description": "Not an exact real-world chance of leaving.", "tone": "teal"},
+             "description": f"Average score {summary['average_score']:.1f}/100.", "tone": "teal"},
         ], columns=4, metric=True)
-        if high:
-            helpful_note(
-                "Where to begin:",
-                f"{high:,} records are in the highest review group. "
-                "Check real purchasing and support history before contacting anyone."
-            )
-        else:
-            helpful_note(
-                "Good to know:",
-                "No records are in the highest review group in this file. "
-                "Keep monitoring activity and continue normal customer care."
-            )
-        section_block(
-            "Which customers have the highest churn risk?",
-            "Review-priority groups are simple demonstration ranges based on model scores.",
+        st.caption(
+            "Predicted churn % = records flagged by the model at the chosen threshold, "
+            "not the actual churn rate. Scores are not calibrated probabilities. "
+            "The 70/40 priority bands are separate from the prediction threshold."
         )
-        left, right = st.columns([1, 1.35], gap="large")
+        left, right = st.columns([1, 1.5], gap="large")
         with left:
             with st.container(border=True):
-                st.markdown("#### Review priority breakdown")
-                st.caption("How many analysed records fall into each priority group?")
-                counts = pd.DataFrame({
-                    "Priority": ["Needs attention", "Keep an eye on", "Lower priority"],
-                    "Customer records": [high, watch, low],
+                st.markdown("#### Risk breakdown")
+                chart_data = pd.DataFrame({
+                    "Group": ["High", "Monitor", "Lower"],
+                    "Records": [summary["high"], summary["moderate"], summary["low"]],
                 })
                 fig = px.bar(
-                    counts, x="Priority", y="Customer records", color="Priority",
-                    text="Customer records", template="plotly_dark",
+                    chart_data, x="Group", y="Records", color="Group",
+                    text="Records", template="plotly_dark",
                     color_discrete_map={
-                        "Needs attention": "#f58da4",
-                        "Keep an eye on": "#efbf76",
-                        "Lower priority": "#5ad7c4",
-                    }
+                        "High": "#f58da4", "Monitor": "#efbf76", "Lower": "#5ad7c4",
+                    },
                 )
                 fig.update_layout(
-                    height=318, showlegend=False, xaxis_title=None,
-                    margin=dict(t=12, l=8, r=8, b=4),
+                    height=300, showlegend=False, xaxis_title=None,
+                    margin=dict(t=15, b=5, l=5, r=5),
                 )
                 st.plotly_chart(fig, use_container_width=True)
         with right:
             with st.container(border=True):
-                st.markdown("#### Customers to review first")
-                st.caption("Highest model scores appear first. Open the list to investigate.")
-                show_customer_table(result, limit=8)
+                st.markdown("#### Customers to review")
+                st.caption("Highest model scores first.")
+                show_customer_table(result, limit=7)
                 st.button(
-                    "Open the full customer list →", type="primary",
+                    "View all customers →", type="primary",
                     on_click=go_to, args=("Customer List",),
                     key="home_customer_list", use_container_width=True,
                 )
-        section_block(
-            "Understand the scores",
-            "A score helps you decide whom to review. "
-            "It does not prove that someone will stop buying.",
-        )
+        section_block("What should your team do?")
         card_grid([
-            {"icon": "🔴", "label": "Needs attention — 70 to 100",
-             "description": "Start by reviewing these customers' recent orders, "
-                            "visits and any support requests.", "tone": "rose"},
-            {"icon": "🟠", "label": "Keep an eye on — 40 to under 70",
-             "description": "Monitor changes in shopping activity and check "
-                            "whether the customer needs help.", "tone": "amber"},
-            {"icon": "🟢", "label": "Lower priority — below 40",
-             "description": "Continue normal service. A lower score is not "
-                            "a promise of another purchase.", "tone": "teal"},
+            {"icon": "🔍", "label": "Review risky customers",
+             "description": "Check orders and support problems first.", "tone": "rose"},
+            {"icon": "💌", "label": "Offer useful help",
+             "description": "Send a suitable update only with consent.", "tone": "purple"},
+            {"icon": "📈", "label": "Check what works",
+             "description": "Track later purchases before claiming success.", "tone": "teal"},
         ])
-        section_block(
-            "See the details behind the numbers",
-            "The chart uses the current model scores, not invented weekly trends.",
-        )
-        lower_left, lower_right = st.columns([1.15, 1], gap="large")
-        with lower_left:
-            with st.container(border=True):
-                st.markdown("#### Churn risk score distribution")
-                st.caption("How many records have low, medium or high model scores?")
-                score_values = pd.DataFrame({
-                    "Churn risk score": result["predicted_no_purchase_risk"].astype(float) * 100
-                })
-                fig_dist = px.histogram(
-                    score_values, x="Churn risk score", nbins=20, template="plotly_dark",
-                    color_discrete_sequence=["#a184f9"],
-                )
-                fig_dist.update_layout(
-                    height=300, xaxis_title="Score out of 100",
-                    yaxis_title="Records", showlegend=False,
-                    margin=dict(t=20, l=8, r=8, b=8),
-                )
-                st.plotly_chart(fig_dist, use_container_width=True)
-        with lower_right:
-            with st.container(border=True):
-                st.markdown("#### Your next actions")
-                st.write("**1. Check a customer.** See the shopping patterns the model used.")
-                st.write("**2. Review real history.** Check recent purchases, visits and service issues.")
-                st.write("**3. Plan a response.** Decide if a follow-up is suitable.")
-                st.button(
-                    "Understand a customer →", on_click=go_to,
-                    args=("Why Customers Are Flagged",),
-                    key="home_explain_button", use_container_width=True,
-                )
-                st.button(
-                    "Open follow-up planner →", on_click=go_to,
-                    args=("Follow-up Planner",),
-                    key="home_plan_button", use_container_width=True,
-                )
-        risk_note()
+        a, b = st.columns(2, gap="medium")
+        with a:
+            st.button("Recommended actions →", on_click=go_to,
+                      args=("Follow-up Planner",), type="primary",
+                      use_container_width=True, key="home_plan_button")
+        with b:
+            st.button("Explain churn (SHAP) →", on_click=go_to,
+                      args=("Why Customers Are Flagged",),
+                      use_container_width=True, key="home_explain_button")
+        with st.expander("What does the churn percentage mean?"):
+            st.write(
+                "This is the share of analysed records flagged by the model's "
+                "yes/no decision. It is not the observed percentage of customers "
+                "who churned, and is not an exact probability. The research model's "
+                "target definition must be confirmed against the REES46 source."
+            )
+            risk_note()
 
-    section_block(
-        "Your store orders, separately",
-        "Normal orders CSV files show what customers actually bought. "
-        "This is not the same as running the REES46 prediction model.",
-    )
-    order_summary = st.session_state.get("store_orders_metadata")
-    if order_summary is None:
-        card_grid([
-            {"icon": "🛍️", "label": "Order history",
-             "description": "Upload your store's paid orders and inspect recent "
-                            "purchasing patterns.", "tone": "purple"},
-            {"icon": "🗓️", "label": "Customers without a recent order",
-             "description": "Choose a number of days to find customers who "
-                            "have not purchased recently.", "tone": "amber"},
-            {"icon": "📑", "label": "Export a customer summary",
-             "description": "Download observed order counts and dates. "
-                            "This is not an AI prediction.", "tone": "teal"},
-        ])
-    else:
-        card_grid([
-            {"icon": "🛍️", "label": "Orders counted",
-             "value": f"{order_summary['orders']:,}",
-             "description": "Orders in your uploaded transaction file.", "tone": "purple"},
-            {"icon": "👤", "label": "Customers in orders file",
-             "value": f"{order_summary['customers']:,}",
-             "description": "Different customer IDs in that file.", "tone": "teal"},
-            {"icon": "🕓", "label": f"No orders in {order_summary['inactive_days']}+ days",
-             "value": f"{order_summary['customers_without_recent_order']:,}",
-             "description": f"Observed as of {order_summary['reference_date']}.", "tone": "amber"},
-        ], metric=True)
-        st.caption(
-            "Order-history counts use a different uploaded file from the customer-risk model. "
-            "They are not connected customer-level predictions."
+    with st.expander("General tips for reducing churn"):
+        st.write(
+            "**Keep service smooth:** solve delivery, payment and support problems.  \n"
+            "**Stay useful:** offer relevant products and reminders where customers agree.  \n"
+            "**Learn from outcomes:** monitor actual purchases and test whether follow-ups help."
         )
-    st.button(
-        "Go to Store Orders →", on_click=go_to, args=("Store Orders (Preview)",),
-        key="home_order_button",
-    )
-    section_block(
-        "Explore what each page can do",
-        "Each section answers one practical question for your online business.",
-    )
-    card_grid([
-        {"icon": "🔎", "label": "Predict Churn",
-         "description":  "Which prepared customer records show "
-                        "higher churn risk based on historical shopping behaviour?", "tone": "purple"},
-        {"icon": "📋", "label": "Customer List",
-         "description": "Who should I look at first, and how do I export "
-                        "a review list?", "tone": "amber"},
-        {"icon": "🧩", "label": "Explain Churn (SHAP)",
-         "description": "Which shopping patterns affected the model score "
-                        "for one customer?", "tone": "teal"},
-        {"icon": "💌", "label": "Follow-up Planner",
-         "description": "What might my team review before choosing "
-                        "a customer-friendly action?", "tone": "rose"},
-        {"icon": "🛒", "label": "Store Orders",
-         "description": "What has happened in actual order records, "
-                        "without making AI predictions?", "tone": "purple"},
-        {"icon": "🧪", "label": "Research Lab",
-         "description": "How was the model tested? See technical metrics "
-                        "and separate experiments for research.", "tone": "teal"},
-    ], columns=3)
-    with st.expander("Detailed guide: How to use every CHURNIQ page"):
+    with st.expander("Other tools and research notes"):
         st.markdown(
-            "**Business Home:** Start here after checking customer records. "
-            "The boxes show how many records need attention, while the charts help you "
-            "spot which scores are most common in your uploaded file.\n\n"
-            "**Check Customers:** Upload a prepared REES46-style customer activity CSV. "
-             "The model uses earlier shopping patterns to estimate a churn-class score. "
-             "The current code describes this outcome as no purchase in four weeks. An ordinary order export "
-            "cannot be used here yet.\n\n"
-            "**Customer List:** Search IDs, focus on a review group and export a CSV. "
-            "Start with higher scores, but verify the customer's actual history first.\n\n"
-            "**Why Customers Are Flagged:** Choose one customer to see which earlier "
-            "shopping signals raised or lowered the model score. These are model "
-            "explanations, not proven reasons for the customer's behaviour.\n\n"
-            "**Follow-up Planner:** Consider customer-friendly review actions such as "
-            "checking orders, browsing patterns or support issues. The system never "
-            "sends messages automatically.\n\n"
-            "**Store Orders:** Upload a normal paid-order CSV. See actual order counts, "
-            "time since the last order and spending summaries. This is historical "
-            "analysis, not a prediction.\n\n"
-            "**Research Lab:** For the supervisor or technical team. Review model "
-            "comparison, experiments, evaluation methods and model settings.\n\n"
-            "**Settings:** Understand score ranges, change the advanced yes/no "
-            "cut-off for future analysis, or clear the current session."
+            "**Orders:** review actual past transactions, not AI predictions.  \n"
+            "**Model Evaluation:** show training and SHAP evidence to your supervisor.  \n"
+            "**Settings:** change the yes/no classification threshold for the next analysis."
         )
-    with st.expander("Useful words explained in simple English"):
-        st.markdown(
-            "**Customer record:** One row of customer information at a given time. "
-            "A customer can appear in more than one record.\n\n"
-            "**Model risk score:** A number from 0 to 100 produced by the model. "
-            "It is not yet a verified real-world probability.\n\n"
-            "**Review priority:** A simple group based on the score. "
-            "Higher means review earlier; it does not prove a customer will leave.\n\n"
-             "**Churn definition:** The current code describes no purchase in four weeks. "
-            "The thesis describes no interaction in the following month. These need verification.\n\n"
-            "**Model explanation (SHAP):** A way to show which input patterns "
-            "moved the model's estimate up or down. It does not show causation."
-        )
+        st.caption(CHURN_PROXY_NOTE)
+
 
 
 elif page == "Store Orders (Preview)":
@@ -865,7 +708,7 @@ elif page == "Customer List":
         chosen = display[display["Priority"].isin(chosen_levels)]
         if keyword:
             chosen = chosen[chosen["Customer ID"].str.contains(keyword, case=False, regex=False)]
-        chosen = chosen.sort_values("Churn risk score (not calibrated)", ascending=False)
+        chosen = chosen.sort_values("Risk score", ascending=False)
         st.caption(f"{len(chosen):,} matching customer records")
         st.dataframe(chosen, use_container_width=True, hide_index=True)
         if not chosen.empty:
@@ -1082,7 +925,7 @@ elif page == "Follow-up Planner":
             "it does not send emails or promotions.",
         )
         priority_table = display_predictions(result[result["risk_band"].isin(["High", "Moderate"])])
-        priority_table = priority_table.sort_values("Churn risk score (not calibrated)", ascending=False)
+        priority_table = priority_table.sort_values("Risk score", ascending=False)
         st.dataframe(priority_table.head(30), use_container_width=True, hide_index=True)
         st.download_button(
             "Download follow-up review list",
