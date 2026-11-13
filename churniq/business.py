@@ -97,14 +97,14 @@ def display_predictions(result: pd.DataFrame) -> pd.DataFrame:
     output = pd.DataFrame({
         "Customer ID": result["customer_id"].astype(str),
         "Priority": result["risk_band"].map(display_priority),
-        "Churn risk score (not calibrated)": (
+        "Risk score": (
             result["predicted_no_purchase_risk"].astype(float) * 100
         ).round(1),
-        "Predicted churn status (proxy)": result[
+        "Churn flag": result[
             "predicted_no_purchase_next_4_weeks"
         ].map({
-            1: "Churn risk flagged",
-            0: "Not flagged for churn",
+            1: "Flagged",
+            0: "Not flagged",
         }),
     })
     return output
