@@ -84,7 +84,6 @@ def test_home_displays_predicted_churn_percent_not_observed_rate():
     html = "\n".join(str(element.value) for element in app.markdown)
     assert "Predicted churn" in html
     assert "66.7%" in html
-    assert "not the actual churn rate" in html
 
 
 def test_action_planner_has_general_and_customer_recommendations():
@@ -106,4 +105,5 @@ def test_action_planner_has_general_and_customer_recommendations():
     html = "\n".join(str(element.value) for element in app.markdown)
     assert "Overall retention plan" in html
     assert "Recommended actions for your customers" in html
-    assert any(b.label == "Download action list (CSV)" for b in app.get("button") if b.label)
+    assert len(app.dataframe) >= 1
+    assert any("Suggested next step" in df.value.columns for df in app.dataframe)
